@@ -170,7 +170,7 @@ inputgen_settings = {
     #'server_num': 50,
     #'server_num': 100,
     #'server_num': 200,
-    'server_num': 10, # 1200
+    'server_num': 1200,
     #'server_num': 2000,
     #'min_server_cpu': 8,
     'min_server_cpu': 1, # 16,
@@ -187,7 +187,7 @@ inputgen_settings = {
     # VM requests
     # method of generating requests: normal_vmreqs, auto_vmreqs
     'VM_request_generation_method': 'auto_vmreqs',
-    'VM_num': 20, # 2000
+    'VM_num': 2000,
     #'VM_num': 5, # only important with normal_vmreqs, not auto_vmreqs
     #'VM_num': 2000,
     # e.g. CPUs
