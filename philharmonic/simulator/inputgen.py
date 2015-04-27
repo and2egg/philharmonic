@@ -100,7 +100,7 @@ max_server_ram = 8
 def normal_infrastructure(locations=['A', 'B'],
                           round_to_hour=True):
     """Generate the cloud's servers with random specs and
-    uniformly distributed over all the locations
+    uniformly or normally distributed over all the locations
 
     """
     # array of server sizes

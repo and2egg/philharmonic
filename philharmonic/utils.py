@@ -28,6 +28,17 @@ def loc(filepath):
     mkdir_p(new_path)
     return os.path.join(conf.output_folder, filepath)
 
+def loc_date(filepath):
+    from philharmonic import conf
+    from time import strftime
+    date = strftime("%Y-%m-%d")
+    time = strftime("%H%M%S")
+    filepath = time + "_" + filepath # save the time as part of the name of the output file
+    filepath = date + "/" + filepath # put the file inside a folder of the current date
+    new_path = os.path.join(conf.output_folder, os.path.dirname(filepath))
+    mkdir_p(new_path)
+    return os.path.join(conf.output_folder, filepath)
+
 def common_loc(filepath):
     from philharmonic import conf
     new_path = os.path.join(conf.common_output_folder,

@@ -14,11 +14,11 @@ from philharmonic import conf
 import philharmonic as ph
 from philharmonic.logger import *
 from philharmonic.scheduler import evaluator
-from philharmonic.utils import loc, common_loc
+from philharmonic.utils import loc, loc_date, common_loc
 from philharmonic import Schedule
 
 def pickle_results(schedule):
-    schedule.actions.to_pickle(loc('schedule.pkl'))
+    schedule.actions.to_pickle(loc_date('schedule.pkl'))
 
 def generate_series_results(cloud, env, schedule, nplots):
     info('\nDynamic results\n---------------')
@@ -41,7 +41,7 @@ def generate_series_results(cloud, env, schedule, nplots):
     # TODO: add frequency to this power calculation
     power = evaluator.generate_cloud_power(util)
     if conf.save_power:
-        power.to_pickle(loc('power.pkl'))
+        power.to_pickle(loc_date('power.pkl'))
     ax = plt.subplot(nplots, 1, 3)
     ax.set_title('Computational power (W)')
     power.plot(ax=ax)
@@ -59,7 +59,7 @@ def generate_series_results(cloud, env, schedule, nplots):
     ax.set_title('Total power (W)')
     power_total.plot(ax=ax)
     if conf.save_power:
-        power_total.to_pickle(loc('power_total.pkl'))
+        power_total.to_pickle(loc_date('power_total.pkl'))
     energy_total = ph.joul2kwh(ph.calculate_energy(power_total))
     # info('\nEnergy with cooling (kWh)')
     # info(energy_total)
@@ -202,7 +202,7 @@ def serialise_results(cloud, env, schedule):
     # Towards Profitable Virtual Machine Placement in the Data Center Shi
     # and Hong 2011 - total profit, revenue and operational cost
     aggregated_results = pd.Series(aggregated, aggr_names)
-    aggregated_results.to_pickle(loc('results.pkl'))
+    aggregated_results.to_pickle(loc_date('results.pkl'))
     #aggregated_results.plot(kind='bar')
     info('\n')
     info(aggregated_results)
@@ -210,7 +210,7 @@ def serialise_results(cloud, env, schedule):
     if conf.liveplot:
         plt.show()
     elif conf.liveplot:
-        plt.savefig(loc('results-graph.pdf'))
+        plt.savefig(loc_date('results-graph.pdf'))
 
     info('\nDone. Results saved to: {}'.format(conf.output_folder))
 

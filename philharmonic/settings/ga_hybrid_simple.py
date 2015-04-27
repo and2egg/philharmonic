@@ -1,9 +1,6 @@
-from .base import *
+from .ga_hybrid import *
 
-output_folder = os.path.join(base_output_folder, "simple/")
-
-prompt_configuration = False
-prompt_show_cloud = False
+output_folder = os.path.join(base_output_folder, "ga_hybrid_simple/")
 
 factory['cloud'] = "small_infrastructure"
 factory['requests'] = "simple_vmreqs"

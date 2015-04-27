@@ -1,8 +1,8 @@
 from .base import *
 
-output_folder = os.path.join(base_output_folder, "simple/")
+output_folder = os.path.join(base_output_folder, "extended/")
 
-prompt_configuration = False
+prompt_configuration = True
 prompt_show_cloud = False
 
 factory['cloud'] = "small_infrastructure"
