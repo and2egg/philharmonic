@@ -307,12 +307,16 @@ class GAScheduler(IScheduler):
             # - maybe add all afterwards
             # TODO: precise indexing, not dict
             # TODO: never directly modify alloc - use place and remove
-            if isinstance(schedule.actions[t], pd.Series):
-                for action in schedule.actions[t].values:
+            try: 
+                if isinstance(schedule.actions[t], pd.Series):
+                    for action in schedule.actions[t].values:
+                        self.cloud.apply(action)
+                else:
+                    action = schedule.actions[t]
                     self.cloud.apply(action)
-            else:
-                action = schedule.actions[t]
-                self.cloud.apply(action)
+            except KeyError:
+                import ipdb; ipdb.set_trace()
+
             state = self.cloud.get_current()
             if not state.all_within_capacity():
                 for server in self.cloud.servers:
@@ -430,7 +434,7 @@ class GAScheduler(IScheduler):
         # debug unallocated VMs
         if best.constr > 0:
             # something is amiss if the best schedule broke constraints
-            #import ipdb; ipdb.set_trace()
+            import ipdb; ipdb.set_trace()
             pass
         return best
 
