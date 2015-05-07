@@ -113,7 +113,7 @@ def normal_infrastructure(locations=['A', 'B'],
 
     servers = []
     for cpu_size, ram_size in zip(cpu_sizes, ram_sizes):
-        location = random.sample(locations, 1)[0]
+        location = random.sample(locations, 1)[0] # return a random sample from all locations
         server = Server(ram_size, cpu_size, location=location)
         servers.append(server)
     return Cloud(servers=servers)
