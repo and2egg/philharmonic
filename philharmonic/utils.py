@@ -22,7 +22,21 @@ def mkdir_p(path):
             pass
         else: raise
 
+# def loc(filepath):
+#     from philharmonic import conf
+#     if conf.add_date_to_folders:
+#         return loc_date(filepath)
+#     else:
+#         return loc_normal(filepath)
+
 def loc(filepath):
+    from philharmonic import conf
+    if conf.add_date_to_folders:
+        return loc_date(filepath)
+    else:
+        return loc_normal(filepath)
+
+def loc_normal(filepath):
     from philharmonic import conf
     new_path = os.path.join(conf.output_folder, os.path.dirname(filepath))
     mkdir_p(new_path)
@@ -31,8 +45,10 @@ def loc(filepath):
 def loc_date(filepath):
     from philharmonic import conf
     from time import strftime
-    date = strftime("%Y-%m-%d")
-    time = strftime("%H%M%S")
+    from time import mktime
+    date = strftime("%Y-%m-%d", conf.current_time)
+    time = strftime("%H%M%S", conf.current_time)
+    filepath = os.path.basename(filepath)
     filepath = time + "_" + filepath # save the time as part of the name of the output file
     filepath = date + "/" + filepath # put the file inside a folder of the current date
     new_path = os.path.join(conf.output_folder, os.path.dirname(filepath))

@@ -142,6 +142,7 @@ beta_option = 1
 max_cloud_usage = 0.8
 
 def within_cloud_capacity(cloud_capacity, requested_capacity, max_cloud_usage):
+    """Iterate through each resource and its (total) capacity"""
     for res, capacity in cloud_capacity.items():
         if requested_capacity[res] > capacity * max_cloud_usage:
             return False

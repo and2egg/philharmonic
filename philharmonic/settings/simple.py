@@ -1,8 +1,12 @@
 from .base import *
+from philharmonic.logger import *
+from philharmonic import conf
 
 output_folder = os.path.join(base_output_folder, "simple/")
 
-# prompt_configuration = True
-
 inputgen_settings['server_num'] = 10
 inputgen_settings['VM_num'] = 20
+
+add_date_to_folders = True
+
+# info('Current time: {}'.format(conf.current_time))

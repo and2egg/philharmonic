@@ -32,6 +32,10 @@ prompt_ipdb = True
 common_output_folder = "io/"
 base_output_folder = os.path.join(common_output_folder, "results/test/")
 output_folder = base_output_folder
+cloud_input_folder = "../"
+add_date_to_folders = False
+if add_date_to_folders:
+    cloud_input_folder = "./"
 
 
 USAGE_LOC = "io/usage/" # path from the philharmonic root
@@ -68,6 +72,9 @@ start = pd.Timestamp('2010-06-03 00:00')
 # - one week
 times = pd.date_range(start, periods=24 * 7, freq='H')
 end = times[-1]
+
+from time import localtime
+current_time = localtime() #pd.datetime.now()
 
 # plotting results
 plotserver = True
