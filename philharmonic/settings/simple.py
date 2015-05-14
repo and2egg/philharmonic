@@ -12,3 +12,5 @@ add_date_to_folders = True
 prompt_configuration = True
 
 power_freq_model = False
+
+factory['temperature'] = None

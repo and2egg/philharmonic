@@ -272,16 +272,17 @@ def log_config_info(simulator):
             pprint.pformat(conf.factory['scheduler_conf'])
         ))
 
-    info('\nServers ({} -> will copy to: {})\n-------\n{}\n'.format(
+    info('\nServers ({} -> will copy to: {})\n-------\n{}'.format(
         common_loc('workload/servers.pkl'),
         os.path.relpath(loc(conf.cloud_input_folder + 'servers.pkl', input=True)),
         simulator.cloud.servers
         #pprint.pformat(simulator.cloud.servers)
         #simulator.cloud.show_usage()
     ))
-    info('- freq. scale from {} to {} by {}.'.format(
-        conf.freq_scale_min, conf.freq_scale_max, conf.freq_scale_delta
-    ))
+    if conf.power_freq_model is not False:
+        info('\n- freq. scale from {} to {} by {}.'.format(
+            conf.freq_scale_min, conf.freq_scale_max, conf.freq_scale_delta
+        ))
     info('\nRequests ({} -> will copy to: {})\n--------\n{}\n'.format(
         common_loc('workload/requests.pkl'),
         os.path.relpath(loc(conf.cloud_input_folder + 'requests.pkl', input=True)),
