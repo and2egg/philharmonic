@@ -274,7 +274,7 @@ def log_config_info(simulator):
 
     info('\nServers ({} -> will copy to: {})\n-------\n{}\n'.format(
         common_loc('workload/servers.pkl'),
-        os.path.relpath(loc(conf.cloud_input_folder + 'servers.pkl')),
+        os.path.relpath(loc(conf.cloud_input_folder + 'servers.pkl', input=True)),
         simulator.cloud.servers
         #pprint.pformat(simulator.cloud.servers)
         #simulator.cloud.show_usage()
@@ -284,7 +284,7 @@ def log_config_info(simulator):
     ))
     info('\nRequests ({} -> will copy to: {})\n--------\n{}\n'.format(
         common_loc('workload/requests.pkl'),
-        os.path.relpath(loc(conf.cloud_input_folder + 'requests.pkl')),
+        os.path.relpath(loc(conf.cloud_input_folder + 'requests.pkl', input=True)),
         simulator.requests)
     )
     if conf.prompt_configuration:
@@ -292,9 +292,9 @@ def log_config_info(simulator):
 
 def archive_inputs(simulator):
     """copy input files together with the results (for archive reasons)"""
-    with open(loc(conf.cloud_input_folder + 'servers.pkl'), 'w') as pkl_srv:
+    with open(loc(conf.cloud_input_folder + 'servers.pkl', input=True), 'w') as pkl_srv:
         pickle.dump(simulator.cloud, pkl_srv)
-    simulator.requests.to_pickle(loc(conf.cloud_input_folder + 'requests.pkl'))
+    simulator.requests.to_pickle(loc(conf.cloud_input_folder + 'requests.pkl', input=True))
 
 def before_start(simulator):
     log_config_info(simulator)
