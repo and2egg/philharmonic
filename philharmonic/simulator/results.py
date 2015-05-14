@@ -212,8 +212,6 @@ def serialise_results(cloud, env, schedule):
     elif conf.liveplot:
         plt.savefig(loc('results-graph.pdf'))
 
-    info('Current time: {}'.format(conf.current_time))
-
     info('\nDone. Results saved to: {}'.format(conf.output_folder))
 
     return aggregated_results
