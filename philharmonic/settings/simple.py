@@ -14,3 +14,6 @@ prompt_configuration = True
 power_freq_model = False
 
 factory['temperature'] = None
+
+factory['scheduler'] = 'SimpleScheduler'
+factory['environment'] = 'SimpleSimulatedEnvironment'

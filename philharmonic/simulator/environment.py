@@ -95,7 +95,7 @@ class SimulatedEnvironment(Environment):
 
     def model_forecast_errors(self, SD_el, SD_temp):
         self.forecast_el = self._generate_forecast(self.el_prices, SD_el)
-        if not self.temperature is None:
+        if self.temperature is not None:
             self.forecast_temp = self._generate_forecast(self.temperature, SD_temp)
 
 class PPSimulatedEnvironment(SimulatedEnvironment):
@@ -154,3 +154,8 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
 
 class GASimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
     pass
+
+class SimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
+    pass
+
+    
