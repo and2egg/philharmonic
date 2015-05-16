@@ -83,7 +83,7 @@ class SimulatedEnvironment(Environment):
         else:
             el_prices = self.el_prices[self.t:self.forecast_end]
 
-        if not temperature is None:
+        if self.temperature is not None:
             if forecast and hasattr(self, 'forecast_temp'):
                 temperature = self.forecast_temp[self.t:self.forecast_end]
             else:
@@ -95,7 +95,7 @@ class SimulatedEnvironment(Environment):
 
     def model_forecast_errors(self, SD_el, SD_temp):
         self.forecast_el = self._generate_forecast(self.el_prices, SD_el)
-        if self.temperature is not None:
+        if not self.temperature is None:
             self.forecast_temp = self._generate_forecast(self.temperature, SD_temp)
 
 class PPSimulatedEnvironment(SimulatedEnvironment):
@@ -143,6 +143,12 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
     def times_index(self):
         """Return a pandas Index based on the set times"""
         idx = pd.date_range(start=self.start, end=self.end, freq=self.period)
+        return idx
+
+    def forecast_window_index(self):
+        """Return a pandas Index from t to forecast_end"""
+        idx = pd.date_range(start=self.t, end=self.forecast_end,
+                            freq=self.period)
         return idx
 
     def get_requests(self):

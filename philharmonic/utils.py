@@ -22,12 +22,22 @@ def mkdir_p(path):
             pass
         else: raise
 
-def loc(filepath, input=False):
+def loc(filepath):
+    """get the file path based on the configured in/out folder"""
     from philharmonic import conf
     if conf.add_date_to_folders:
-        return loc_date(filepath, input)
+        return loc_date(filepath, input_loc)
     else:
         return loc_normal(filepath)
+
+def input_loc(filepath):
+    """as loc(), but for input files expected at conf.cloud_input_folder"""
+    from philharmonic import conf
+    if conf.add_date_to_folders:
+        return loc_date(os.path.join(conf.cloud_input_folder, filepath),
+                        input_loc=True)
+    else:
+        return loc_normal(os.path.join(conf.cloud_input_folder, filepath))
 
 def loc_normal(filepath):
     from philharmonic import conf
@@ -35,7 +45,7 @@ def loc_normal(filepath):
     mkdir_p(new_path)
     return os.path.join(conf.output_folder, filepath)
 
-def loc_date(filepath, input):
+def loc_date(filepath, input_loc):
     from philharmonic import conf
     from time import strftime
     from time import mktime
@@ -43,7 +53,7 @@ def loc_date(filepath, input):
     time = strftime("%H%M%S", conf.current_time)
     filepath = os.path.basename(filepath)
 
-    if(input): 
+    if input_loc:
         type = "input"
     else:
         type = "output"

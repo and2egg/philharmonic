@@ -5,6 +5,8 @@ Created on Oct 9, 2012
 '''
 
 import os
+from time import localtime
+
 import pandas as pd
 # import numpy as np
 # import pylab as pl
@@ -36,6 +38,17 @@ cloud_input_folder = "../"
 add_date_to_folders = False
 if add_date_to_folders:
     cloud_input_folder = "./"
+
+# control whether the output folders should be time-stamped
+add_date_to_folders = False
+if add_date_to_folders:
+    cloud_input_folder = "./"
+else:
+    cloud_input_folder = "../"
+
+# the real local time when the simulation is executed
+# (used to optionally time-stamp files)
+current_time = localtime()
 
 
 USAGE_LOC = "io/usage/" # path from the philharmonic root
@@ -226,13 +239,22 @@ P_idle = 100
 P_std = 0
 P_base = 150
 P_dif = 15
-# VM cost components
+
+
+# VM cost components for ElasticHosts
 C_base = 0.027028 #0.0520278  # in future use C_base = 0.027028
 C_dif_cpu = 0.018
 C_dif_ram = 0.025
 # CPU frequency parameters
 f_max = 2600 # the maximum CPU frequency in MHz
 power_freq_model = True # consider CPU frequency in the power model
+
+# VM cost components for ElasticHosts
+#C_base = 0.004529 # $/hour #C_base=0.012487, C_dif_ram=0 if we don't vary memory
+#C_dif_cpu = 0.001653 # $/hour
+#C_dif_ram=0.007958 # $/hour
+#rel_ram_size=2 #at least 2: min ram size charged
+
 # TODO: apply to model
 freq_scale_max = 1.0
 freq_scale_digits = 5

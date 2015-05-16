@@ -17,10 +17,10 @@ from philharmonic.utils import deprecated, CommonEqualityMixin
 from . import visualiser
 
 def format_spec(spec):
-    """Return a string containing the resource 
+    """Return a string containing the resource
     key-value pairs in spec (valid for PM and VM)
 
-    Sample output: 
+    Sample output:
     {RAM:28 #CPUs:3}
     """
     s = "{"
@@ -577,6 +577,9 @@ class Schedule(object):
     def __init__(self):
         self.actions = pd.TimeSeries()
         self.actions.name = 'actions'
+
+    def copy(self):
+        return copy.copy(self)
 
     def sort(self):
         # - actions in the current time have to be sorted by Action.rank()
