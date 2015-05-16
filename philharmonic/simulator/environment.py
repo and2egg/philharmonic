@@ -122,8 +122,7 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
             self._t = 0
             self._period = 1
             self.el_prices = []
-            if not temperature is None:
-                self.temperature = []
+            self.temperature = []
         self._forecast_periods = forecast_periods
 
     # TODO: better to make the environment immutable

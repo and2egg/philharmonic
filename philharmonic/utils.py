@@ -22,28 +22,33 @@ def mkdir_p(path):
             pass
         else: raise
 
-def loc(filepath):
-    """get the file path based on the configured in/out folder"""
-    from philharmonic import conf
-    if conf.add_date_to_folders:
-        return loc_date(filepath, input_loc)
-    else:
-        return loc_normal(filepath)
-
 def input_loc(filepath):
-    """as loc(), but for input files expected at conf.cloud_input_folder"""
+    """get the file path based on the configured input folder"""
     from philharmonic import conf
     if conf.add_date_to_folders:
-        return loc_date(os.path.join(conf.cloud_input_folder, filepath),
+        return loc_date(os.path.join(filepath),
                         input_loc=True)
     else:
-        return loc_normal(os.path.join(conf.cloud_input_folder, filepath))
+        return loc_normal(os.path.join(filepath),
+                        input_loc=True)
 
-def loc_normal(filepath):
+def output_loc(filepath):
+    """get the file path based on the configured output folder"""
     from philharmonic import conf
-    new_path = os.path.join(conf.output_folder, os.path.dirname(filepath))
-    mkdir_p(new_path)
-    return os.path.join(conf.output_folder, filepath)
+    if conf.add_date_to_folders:
+        return loc_date(filepath, input_loc=False)
+    else:
+        return loc_normal(filepath, input_loc=False)
+
+def loc_normal(filepath, input_loc):
+    from philharmonic import conf
+    if(input_loc):
+        rel_folder = conf.rel_input_folder(conf.add_date_to_folders)
+    else:
+        rel_folder = conf.rel_output_folder(conf.add_date_to_folders)
+    path = conf.output_folder + rel_folder
+    mkdir_p(path)
+    return os.path.join(path, filepath)
 
 def loc_date(filepath, input_loc):
     from philharmonic import conf
@@ -55,13 +60,15 @@ def loc_date(filepath, input_loc):
 
     if input_loc:
         type = "input"
+        rel_folder = conf.rel_input_folder(conf.add_date_to_folders)
     else:
         type = "output"
+        rel_folder = conf.rel_output_folder(conf.add_date_to_folders)
     filepath = time + "_" + type + "_" + filepath # save the time as part of the name of the output file
     filepath = date + "/" + filepath # put the file inside a folder of the current date
-    new_path = os.path.join(conf.output_folder, os.path.dirname(filepath))
-    mkdir_p(new_path)
-    return os.path.join(conf.output_folder, filepath)
+    path = conf.output_folder + rel_folder
+    mkdir_p(path)
+    return os.path.join(path, filepath)
 
 def common_loc(filepath):
     from philharmonic import conf

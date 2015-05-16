@@ -34,17 +34,21 @@ prompt_ipdb = True
 common_output_folder = "io/"
 base_output_folder = os.path.join(common_output_folder, "results/test/")
 output_folder = base_output_folder
-cloud_input_folder = "../"
-add_date_to_folders = False
-if add_date_to_folders:
-    cloud_input_folder = "./"
 
-# control whether the output folders should be time-stamped
+# control whether the input and/or output folders should be time-stamped
 add_date_to_folders = False
-if add_date_to_folders:
-    cloud_input_folder = "./"
-else:
-    cloud_input_folder = "../"
+
+def rel_input_folder(add_date):
+    if add_date:
+        return ""
+    else:
+        return "../"
+
+def rel_output_folder(add_date):
+    if add_date:
+        return ""
+    else:
+        return ""
 
 # the real local time when the simulation is executed
 # (used to optionally time-stamp files)

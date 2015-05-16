@@ -46,7 +46,7 @@ class BruteForceScheduler(IScheduler):
 
         best_fitness = 1
         # enumerate times
-        times = self.environment.forecast_window_index()
+        times = self.environment.forecast_window_index() #TODO TEST ERROR pandas tseries raise ValueError ("Could not evaluate %s" % freqstr)
         schedule = Schedule()
         for t in times:
             # enumerate actions

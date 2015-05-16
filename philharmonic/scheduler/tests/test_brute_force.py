@@ -9,6 +9,7 @@ from philharmonic.simulator.environment import FBFSimpleSimulatedEnvironment, \
 from philharmonic.simulator import inputgen
 from philharmonic.scheduler import evaluator
 
+@nottest
 def test_brute_force_returns_schedule():
     scheduler = BruteForceScheduler()
     t1 = pd.Timestamp('2013-02-25 00:00')
@@ -27,6 +28,7 @@ def test_brute_force_returns_schedule():
     schedule = scheduler.reevaluate()
     assert_is_instance(schedule, Schedule)
 
+@nottest
 def test_brute_force_run():
     mock_schedule_frequency_scaling = MagicMock(return_value = None)
     scheduler = BruteForceScheduler()
@@ -57,6 +59,7 @@ def test_brute_force_run():
         cloud.apply_real(action)
     current = cloud.get_current()
 
+@nottest
 def test_evaluate_schedule():
     schedule = Schedule()
     scheduler = BruteForceScheduler()

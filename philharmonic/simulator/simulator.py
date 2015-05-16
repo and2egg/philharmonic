@@ -41,7 +41,7 @@ from philharmonic.manager.imanager import IManager
 from philharmonic.scheduler import NoScheduler
 from philharmonic.scheduler.peak_pauser.peak_pauser import PeakPauser
 from environment import SimulatedEnvironment, PPSimulatedEnvironment
-from philharmonic.utils import loc, common_loc, input_loc
+from philharmonic.utils import common_loc, input_loc
 
 
 # old scheduler design...

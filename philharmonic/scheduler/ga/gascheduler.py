@@ -434,7 +434,7 @@ class GAScheduler(IScheduler):
         # debug unallocated VMs
         if best.constr > 0:
             # something is amiss if the best schedule broke constraints
-            import ipdb; ipdb.set_trace()
+            # import ipdb; ipdb.set_trace()
             pass
         return best
 
