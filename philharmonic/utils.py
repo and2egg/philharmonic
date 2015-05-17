@@ -42,7 +42,7 @@ def output_loc(filepath):
 
 def loc_normal(filepath, input_loc):
     from philharmonic import conf
-    if(input_loc):
+    if input_loc:
         rel_folder = conf.rel_input_folder(conf.add_date_to_folders)
     else:
         rel_folder = conf.rel_output_folder(conf.add_date_to_folders)
@@ -65,8 +65,8 @@ def loc_date(filepath, input_loc):
         type = "output"
         rel_folder = conf.rel_output_folder(conf.add_date_to_folders)
     filepath = time + "_" + type + "_" + filepath # save the time as part of the name of the output file
-    filepath = date + "/" + filepath # put the file inside a folder of the current date
-    path = conf.output_folder + rel_folder
+    # filepath = date + "/" + filepath # put the file inside a folder of the current date
+    path = conf.output_folder + rel_folder + date + "/"
     mkdir_p(path)
     return os.path.join(path, filepath)
 

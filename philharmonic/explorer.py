@@ -6,7 +6,7 @@ import pandas as pd
 from philharmonic import conf
 from philharmonic.simulator.simulator import run
 from philharmonic.logger import info
-from philharmonic.utils import loc
+from philharmonic.utils import output_loc
 
 def _generate_range(min_value, max_value, resolution):
     return np.arange(min_value, max_value + resolution, resolution)
@@ -96,7 +96,7 @@ def _process_results(all_results, new_results):
     all_results['cost'].append(cost)
 
 def _serialise_results(results):
-    results.to_pickle(loc('exploration_results.pkl'))
+    results.to_pickle(output_loc('exploration_results.pkl'))
 
 # TODO: maybe this function should be a method of ParameterSpace
 def _iterate_run(parameter_space):
