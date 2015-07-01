@@ -23,3 +23,6 @@ __pycache__/
 
 # profiling data
 mprofile_*.dat
+
+# R
+.Rhistory

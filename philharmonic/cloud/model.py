@@ -43,7 +43,7 @@ class Machine(object):
         self.id = type(self)._new_id()
         self.spec = {}
         for (i, arg) in enumerate(args):
-            self.spec[self.resource_types[i]] = arg
+            self.spec[self.resource_types[i]] = arg  # map resource type to its value
 
     def __str__(self):
         return self.__repr__()
@@ -142,7 +142,7 @@ class Server(Machine):
     def __init__(self, *args, **kwargs):
         """@param location: server's geographical location"""
         super(Server, self).__init__(*args)
-        self.cap = self.spec
+        self.cap = self.spec  # map resource type to its value
         if 'location' in kwargs:
             self._loc = kwargs['location']
 
@@ -186,7 +186,7 @@ class State(object):
         self.servers = servers
         self.vms = vms
         self._alloc = {} # servers -> allocated machines
-        # servers -> remaining free capacity
+        # servers -> remaining free capacity (RAM and #CPUs)
         self.free_cap = {s : copy.copy(s.cap) for s in servers}
         # server capacities in a handy DataFrame for further calculations
         self.cap_df = pd.DataFrame({s: s.cap for s in self.servers})
