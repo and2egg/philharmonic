@@ -3,7 +3,8 @@ from philharmonic import Schedule, Migration
 from philharmonic.logger import info, debug, error
 
 class SimpleScheduler(IScheduler):
-    """Simple scheduler."""
+    """Simple scheduler. Should find host based on capacities
+        and energy prices applying a greedy algorithm. """
 
     def __init__(self, cloud=None, driver=None):
         IScheduler.__init__(self, cloud, driver)
