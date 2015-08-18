@@ -66,18 +66,27 @@ DATA_LOC = os.path.realpath(os.path.join(os.path.dirname(__file__),
 
 # the datasets used in the simulation
 USA = False # USA or world-wide
+MIXED = True # Mixed input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
 FIXED_EL_PRICES = False # fixed el. prices world-wide
 DATA_LOC_USA = os.path.join(DATA_LOC, "usa/")
+DATA_LOC_MIXED = os.path.join(DATA_LOC, "mixed/")
 DATA_LOC_WORLD = os.path.join(DATA_LOC, "world/")
 DATA_LOC_WORLD_FIXED_EL = os.path.join(DATA_LOC, "world-fixed_el/")
 if USA:
     DATA_LOC = DATA_LOC_USA
+elif MIXED:
+    DATA_LOC = DATA_LOC_MIXED
 else:
     DATA_LOC = DATA_LOC_WORLD
     if FIXED_EL_PRICES:
         DATA_LOC = DATA_LOC_WORLD_FIXED_EL
-temperature_dataset = os.path.join(DATA_LOC, 'temperatures.csv')
-el_price_dataset = os.path.join(DATA_LOC, 'prices.csv')
+if not MIXED:
+    temperature_dataset = os.path.join(DATA_LOC, 'temperatures.csv')
+    el_price_dataset = os.path.join(DATA_LOC, 'prices.csv')
+else:
+    el_price_dataset = os.path.join(DATA_LOC, 'prices_da.csv')
+
+date_parser = None
 
 # the time period of the simulation
 start = pd.Timestamp('2010-06-03 00:00')
@@ -97,11 +106,21 @@ current_time = localtime() #pd.datetime.now()
 plotserver = True
 #plotserver = False
 if plotserver: # plotting in GUI-less environment
-    liveplot = False
-else: # GUI present (desktop OS)
-    liveplot = False
-    #liveplot = True
+    liveplot = True
+# else: # GUI present (desktop OS)
+#     liveplot = False
+#     #liveplot = True
+#     fileplot = True
+
+
+plot_live = plotserver
+
+if plot_live:
+    liveplot = True
     fileplot = False
+else:
+    liveplot = False
+    fileplot = True
 
 
 # Manager
@@ -178,6 +197,8 @@ def get_factory():
 # Percentage of utilisation under which a PM is considered underutilised
 underutilised_threshold = 0.5
 
+ignore_ram = False
+
 # inputgen settings
 #==================
 
@@ -188,7 +209,8 @@ inputgen_settings = {
     'resource_distribution': 'uniform',
 
     # cloud's servers
-    'location_dataset': temperature_dataset,
+    'location_dataset': el_price_dataset,
+    # 'location_dataset': usa_el
     #'server_num': 3,
     #'server_num': 1,
     #'server_num': 50,
@@ -206,26 +228,36 @@ inputgen_settings = {
     # 3 for all beta equal to 1
     'beta_option': 3,
     'fixed_beta_value': 1.,
+    # indicates whether the beta value should be displayed on output
+    'show_beta_value': True,
     'max_cloud_usage': 0.8,
+    # method of generating servers for cloud infrastructure: 
+    # normal_infrastructure, uniform_infrastructure
+    'cloud_infrastructure': 'normal_infrastructure',
 
     # VM requests
-    # method of generating requests: normal_vmreqs, auto_vmreqs
+    # method of generating requests: normal_vmreqs, auto_vmreqs, normal_vmreqs_interval
     'VM_request_generation_method': 'auto_vmreqs',
+    'round_to_hour': True,
+    # only applicable when VM_request_generation_method is 'normal_vmreqs_interval' 
+    'vm_req_interval': '5min',
+    # number of VMs to generate in requests
     'VM_num': 2000,
     #'VM_num': 5, # only important with normal_vmreqs, not auto_vmreqs
-    #'VM_num': 2000,
     # e.g. CPUs
     'min_cpu': 1, # 8,
     'max_cpu': 1, # 8,
     'min_ram': 8, # 2,
     'max_ram': 32, # 28,
     # e.g. seconds
-    'min_duration': 60 * 60, # 1 hour
+    'min_duration': 60, # 1 minute
+    # 'min_duration': 60 * 60, # 1 hour
     #'max_duration': 60 * 60 * 3, # 3 hours
     #'max_duration': 60 * 60 * 6, # 6 hours
+    'max_duration': 60 * 60 * 10, # 10 hours
     #'max_duration': 60 * 60 * 24, # 24 hours
     #'max_duration': 60 * 60 * 24 * 3, # 2 days
-    'max_duration': 60 * 60 * 24 * 7, # one week
+    # 'max_duration': 60 * 60 * 24 * 7, # one week
     #'max_duration': 60 * 60 * 24 * 10, # 10 days
     #'max_duration': 60 * 60 * 24 * 90, # 90 days
 }
@@ -235,7 +267,7 @@ inputgen_settings = {
 
 # the frequency at which to generate the power signals
 power_freq = '5min'
-# various power values of the servers in Watts
+# various power values of the servers in Watt hours
 P_peak = 200
 P_idle = 100
 # the standard deviation of the power signal
@@ -244,6 +276,7 @@ P_std = 0
 P_base = 150
 P_dif = 15
 
+power_randomize = True
 
 # VM cost components for ElasticHosts
 C_base = 0.027028 #0.0520278  # in future use C_base = 0.027028
@@ -258,6 +291,8 @@ power_freq_model = True # consider CPU frequency in the power model
 #C_dif_cpu = 0.001653 # $/hour
 #C_dif_ram=0.007958 # $/hour
 #rel_ram_size=2 #at least 2: min ram size charged
+
+show_pm_frequencies = True
 
 # TODO: apply to model
 freq_scale_max = 1.0
@@ -275,6 +310,12 @@ f_base = 1000
 # pricing
 # the frequency at which to generate the VM price is calculated
 pricing_freq = '1h'
+# checks whether a price transformation from kWh (MWh) to jouls will be done
+transform_to_jouls = True
+
+prices_in_mwh = False
+
+alternate_cost_model = False
 
 # Benchmark
 #===========

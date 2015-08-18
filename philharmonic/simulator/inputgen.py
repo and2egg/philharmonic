@@ -118,6 +118,26 @@ def normal_infrastructure(locations=['A', 'B'],
         servers.append(server)
     return Cloud(servers=servers)
 
+def uniform_infrastructure(locations = ['A', 'B']):
+    """return a list of Servers distributed uniformly over all locations 
+    with determined resource capacities
+    @author Andreas
+
+    """
+    servers = []
+    servers_per_location = int(round(server_num / len(locations)))
+    for location in locations:
+        # array of server sizes
+        cpu_sizes = [max_server_cpu]*servers_per_location
+        ram_sizes = [max_server_ram]*servers_per_location
+    
+        for cpu_size, ram_size in zip(cpu_sizes, ram_sizes):
+            server = Server(ram_size, cpu_size, location=location)
+            servers.append(server)
+
+    return Cloud(servers=servers)
+
+
 # VM requests
 #------------
 # simulate how users will use our cloud
@@ -140,6 +160,8 @@ max_duration = 60 * 60 * 3 # 3 hours
 #max_duration = 60 * 60 * 24 * 10 # 10 days
 beta_option = 1
 max_cloud_usage = 0.8
+
+round_to_hour = True
 
 def within_cloud_capacity(cloud_capacity, requested_capacity, max_cloud_usage):
     """Iterate through each resource and its (total) capacity"""
@@ -254,6 +276,54 @@ def normal_vmreqs(start, end, round_to_hour=True, **kwargs):
             requests.append(VMRequest(vm, 'delete'))
             t = start + offset
             if round_to_hour:
+                t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour)
+            moments.append(t)
+    events = pd.TimeSeries(data=requests, index=moments)
+    return events.sort_index()
+
+def normal_vmreqs_interval(start, end, vm_req_interval='5min', **kwargs):
+    """Generate the VM creation and deletion events in.
+    Normally distributed arrays - VM sizes and durations.
+    @param start, end - time interval (events within it)
+
+    """
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    delta = end - start
+    # array of VM sizes
+    cpu_sizes = distribution_population(VM_num, min_cpu, max_cpu,
+                                        distribution=resource_distribution)
+    ram_sizes = distribution_population(VM_num, min_ram, max_ram,
+                                        distribution=resource_distribution)
+    # duration of VMs
+    durations = distribution_population(VM_num, min_duration, max_duration,
+                                        distribution=resource_distribution)
+    requests = []
+    moments = []
+    for cpu_size, ram_size, duration in zip(cpu_sizes, ram_sizes, durations):
+        vm = VM(ram_size, cpu_size)
+        # the moment a VM is created
+        offset = pd.offsets.Second(np.random.uniform(0., delta.total_seconds()))
+        requests.append(VMRequest(vm, 'boot'))
+        t = start + offset
+        # import ipdb; ipdb.set_trace()
+        if vm_req_interval == '5min':
+            minute = t.minute - (t.minute % 5)
+            t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour) + pd.offsets.Minute(minute)
+        elif vm_req_interval == '1hour':
+            t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour)
+        moments.append(t)
+
+        # new offset from the new timestamp t
+        offset = t - start
+        # the moment a VM is destroyed
+        offset += pd.offsets.Second(duration)
+        if start + offset <= end: # event is relevant
+            requests.append(VMRequest(vm, 'delete'))
+            t = start + offset
+            if vm_req_interval == '5min':
+                minute = t.minute - (t.minute % 5)
+                t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour) + pd.offsets.Minute(minute)
+            elif vm_req_interval == '1h':
                 t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour)
             moments.append(t)
     events = pd.TimeSeries(data=requests, index=moments)
@@ -426,6 +496,9 @@ def get_data_loc(filename):
 def get_data_loc_usa(filename):
     return os.path.join(conf.DATA_LOC_USA, filename)
 
+def get_data_loc_mixed(filename):
+    return os.path.join(conf.DATA_LOC_MIXED, filename)
+
 def get_data_loc_world(filename):
     return os.path.join(conf.DATA_LOC_WORLD, filename)
 
@@ -523,20 +596,22 @@ def dynamic_infrastructure():
 
 # geotemporal inputs
 #--------------------
-def parse_dataset(filepath):
+def parse_dataset(filepath, custom_date_parser=None):
     """Parse a file with CSV values (e.g. temperatures or el. prices)
     into a pandas.DataFrame.
 
     """
-    df = pd.read_csv(filepath,
-                     index_col=0, parse_dates=[0])
+    if custom_date_parser is None:
+        df = pd.read_csv(filepath, index_col=0, parse_dates=[0])
+    else:
+        df = pd.read_csv(filepath, index_col=0, parse_dates=[0], date_parser=custom_date_parser)
     return df
 
 def times_from_conf():
     return conf.times
 
 def el_prices_from_conf():
-    el_prices = parse_dataset(conf.el_price_dataset)
+    el_prices = parse_dataset(conf.el_price_dataset, conf.date_parser)
     return el_prices
 
 def temperature_from_conf():
@@ -564,8 +639,6 @@ def modify_existing_input():
 # initial input generation
 #--------------------------
 
-location_dataset = usa_el
-
 def generate_fixed_input():
     """Entry function to generate servers and requests based
     on the desired simulation time period and locations.
@@ -580,9 +653,10 @@ def generate_fixed_input():
          '- times: {} - {}\n'.format(start, end)
     )
     info('Locations:\n{}\n'.format(locations))
-    cloud = normal_infrastructure(locations) #TODO: method as parameter
+    generate_cloud = globals()[cloud_infrastructure]
+    cloud = generate_cloud(locations)
     generate_requests = globals()[VM_request_generation_method]
-    requests = generate_requests(start, end, servers=cloud.servers)
+    requests = generate_requests(start, end, round_to_hour=round_to_hour, servers=cloud.servers)
     with open(common_loc('workload/servers.pkl'), 'w') as pkl_srv:
         pickle.dump(cloud, pkl_srv)
     requests.to_pickle(common_loc('workload/requests.pkl'))

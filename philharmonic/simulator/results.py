@@ -8,7 +8,9 @@ from datetime import datetime
 import pprint
 
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 from philharmonic import conf
 import philharmonic as ph
@@ -69,10 +71,11 @@ def generate_series_results(cloud, env, schedule, nplots):
     # info(' - total:')
     # info(energy_total.sum())
 
-    # pm frequencies
-    info('\nPM frequencies (MHz)')
-    pm_freqs = evaluator.calculate_cloud_frequencies(cloud, env, schedule)
-    info(pm_freqs)
+    if conf.show_pm_frequencies:
+        # pm frequencies
+        info('\nPM frequencies (MHz)')
+        pm_freqs = evaluator.calculate_cloud_frequencies(cloud, env, schedule)
+        info(pm_freqs)
 
     # PM avgutilization
     #info('\nPM Avg.Utilization')
@@ -128,9 +131,11 @@ def serialise_results(cloud, env, schedule):
     migration_energy, migration_cost = evaluator.calculate_migration_overhead(
         cloud, env, schedule
     )
+    info(' - total energy:')
+    info(energy_total)
     info('Migration energy (kWh)')
     info(migration_energy)
-    info(' - total with migrations:')
+    info(' - total energy with migrations:')
     info(energy_total + migration_energy)
     info('\nMigration cost ($)')
     info(migration_cost)
@@ -214,9 +219,45 @@ def serialise_results(cloud, env, schedule):
 
     if conf.liveplot:
         plt.show()
-    elif conf.liveplot:
+    elif conf.fileplot:
         plt.savefig(output_loc('results-graph.pdf'))
 
     info('\nDone. Results saved to: {}'.format(conf.output_folder))
 
     return aggregated_results
+
+
+def serialise_results_tests():
+    def update_line(num, data, line):
+        line.set_data(data[...,:num])
+        return line,
+
+    fig1 = plt.figure()
+
+    data = np.random.rand(2, 25)
+    l, = plt.plot([], [], 'r-')
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.xlabel('x')
+    plt.title('test')
+    line_ani = animation.FuncAnimation(fig1, update_line, 25, fargs=(data, l),
+        interval=50, blit=True)
+    #line_ani.save('lines.mp4')
+
+    fig2 = plt.figure()
+
+    x = np.arange(-9, 10)
+    y = np.arange(-9, 10).reshape(-1, 1)
+    base = np.hypot(x, y)
+    ims = []
+    for add in np.arange(15):
+        ims.append((plt.pcolor(x, y, base + add, norm=plt.Normalize(0, 30)),))
+
+    im_ani = animation.ArtistAnimation(fig2, ims, interval=50, repeat_delay=3000,
+        blit=True)
+    #im_ani.save('im.mp4', metadata={'artist':'Guido'})
+
+    plt.show()
+
+
+

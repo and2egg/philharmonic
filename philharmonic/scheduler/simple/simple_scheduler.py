@@ -27,8 +27,10 @@ class SimpleScheduler(IScheduler):
             utilisations[i] = used/server.cap[i]
             if used > server.cap[i]: # capacity exceeded for this resource
                 return -1
-        uniform_weight = 1./len(server.resource_types)
-        weights = {res : uniform_weight for res in server.resource_types}
+        uniform_weight = 1./len(server.resource_types)  
+        # TODO_Andreas: take weight from class instead of the standard weight
+        weights = server._weights
+        # weights = {res : uniform_weight for res in server.resource_types}
         for resource_type, utilisation in utilisations.iteritems():
             total_utilisation += weights[resource_type] * utilisation
         return total_utilisation
@@ -46,18 +48,22 @@ class SimpleScheduler(IScheduler):
         t = self.environment.get_time()
         # get new requests
         requests = self.environment.get_requests()
-        # if len(requests) > 0:
-        #    import ipdb; ipdb.set_trace()
-        for request in requests:
+        
+        for t_req, request in requests.iteritems():
+        # for request in requests:
+            import ipdb; ipdb.set_trace()
             if request.what == 'boot':
 
                 server = self.find_host(request.vm)
                 if server is None:
                     error('not enough free resources for VM {}'.format(request.vm))
                 else:
+                    # import ipdb; ipdb.set_trace()
                     action = Migration(request.vm, server)
                     self.cloud.apply(action)
-                    self.schedule.add(action, t)
+                    # important! take time of request (t_req) 
+                    # instead of t to add to actions (not rounded to hours)
+                    self.schedule.add(action, t_req)
         # for each boot request:
         # find the best server
         #  - find server that can host this VM
@@ -65,3 +71,6 @@ class SimpleScheduler(IScheduler):
         # add new migration to the schedule
         self.cloud.reset_to_real()
         return self.schedule
+
+    def finalize(self):
+        pass

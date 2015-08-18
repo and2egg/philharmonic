@@ -113,10 +113,12 @@ def generate_cloud_power(util, start=None, end=None,
         )
     else:
         power = ph.calculate_power(util, conf.P_idle, conf.P_peak)
+
     # fill it out to the full frequency
     power = power.resample(conf.power_freq, fill_method='pad')
     # add random noise
-    power[power > 0] += conf.P_std * np.random.randn(*power.shape)
+    if conf.power_randomize:
+        power[power > 0] += conf.P_std * np.random.randn(*power.shape)
     return power
 
 def calculate_cloud_cost(power, el_prices):
@@ -127,7 +129,12 @@ def calculate_cloud_cost(power, el_prices):
     for server in power.columns: # this might be very inefficient
         loc = server.loc
         el_prices_loc[server] = el_prices[loc][start:end]
-    cost = ph.calculate_price(power, el_prices_loc)#ph.calculate_price_mean(power, el_prices_loc)
+    jouls = conf.transform_to_jouls
+    mwh = conf.prices_in_mwh
+    if conf.alternate_cost_model:
+        cost = ph.calculate_price_new(power, el_prices_loc, transform_to_jouls=jouls, prices_in_mwh=mwh)
+    else:
+        cost = ph.calculate_price(power, el_prices_loc)#ph.calculate_price_mean(power, el_prices_loc)
     return cost
 
 def calculate_cloud_cooling(power, temperature):
@@ -402,6 +409,7 @@ def calculate_migration_overhead(cloud, environment, schedule,
                 migration_data = V_mig(memory, R, D, n)
                 energy = E_mig(migration_data) # Joules
                 energy = ph.joul2kwh(energy) # kWh
+                import ipdb; ipdb.set_trace()
                 total_energy += energy
                 cost = energy * mean_el_price
                 total_cost += cost

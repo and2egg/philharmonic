@@ -28,12 +28,16 @@ if conf.plotserver:
     import matplotlib.pyplot as plt
 else:
     import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+
 import pandas as pd
+import numpy as np
 
 import philharmonic as ph
 from philharmonic.logger import *
 import inputgen
 from .results import serialise_results
+from .results import serialise_results_tests
 from philharmonic import Schedule
 from philharmonic.scheduler.generic.fbf_optimiser import FBFOptimiser
 from philharmonic.manager.imanager import IManager
@@ -132,7 +136,10 @@ class Simulator(IManager):
         super(Simulator, self).__init__()
         self.environment.el_prices = self._create(inputgen,
                                                   self.factory['el_prices'])
-        self.environment.temperature = self._create(inputgen,
+        if self.factory['temperature'] is None:
+            self.environment.temperature = None
+        else:
+            self.environment.temperature = self._create(inputgen,
                                                     self.factory['temperature'])
         SD_el = self.factory['SD_el'] if 'SD_el' in self.factory  else 0
         SD_temp = self.factory['SD_temp'] if 'SD_temp' in self.factory  else 0
@@ -143,6 +150,7 @@ class Simulator(IManager):
         """apply actions (or requests) on the cloud (for "real") and log them"""
         self.cloud.reset_to_real()
         for t, action in actions.iteritems():
+            # import ipdb; ipdb.set_trace()
             #debug('apply %s at time %d'.format(action, t))
             self.cloud.apply_real(action)
             self.real_schedule.add(action, t)
@@ -182,9 +190,6 @@ class Simulator(IManager):
             requests = self.environment.get_requests()
             # - apply requests on the simulated cloud
             self.apply_actions(requests)
-            if len(requests) > 0:
-                #import ipdb; ipdb.set_trace()
-                pass
             # call scheduler to decide on actions
             schedule = self.scheduler.reevaluate()
             self.cloud.reset_to_real()
@@ -198,6 +203,7 @@ class Simulator(IManager):
             if len(planned_actions) > 0:
                 debug('Planned:\n{}\n'.format(planned_actions))
             self.apply_actions(actions)
+            # import ipdb; ipdb.set_trace()
             if conf.show_cloud_interval is not None and t == t_show:
                 t_show = t_show + conf.show_cloud_interval
                 self.show_cloud_usage()

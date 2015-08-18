@@ -37,7 +37,12 @@ class ModelUsageError(Exception):
 # some non-semantic functionality common for VMs and servers
 class Machine(object):
     resource_types = ['RAM', '#CPUs'] # can be overridden
-    _weights = None
+    # _weights = None
+    _weights = {'RAM': 0, '#CPUs': 1}
+
+    # TODO_Andreas: ignore ram
+    # if conf.ignore_ram:
+    #     _weights = {'RAM': 0, '#CPUs': 1}
 
     def __init__(self, *args):
         self.id = type(self)._new_id()
@@ -124,6 +129,7 @@ class VM(Machine):
     def unpause(self):
         _delegate_to_obj(self.cloud, self.unpause.__name__, self)
 
+    #TODO_Andreas: migrate should call self.migrate.__name__ ? 
     def migrate(self, server):
         _delegate_to_obj(self.cloud, self.pause.__name__, self, server)
 
@@ -256,6 +262,7 @@ class State(object):
     def migrate(self, vm, s):
         """change current state to have vm in s instead of the old location"""
         if vm not in self.vms:
+            import ipdb; ipdb.set_trace()
             raise ModelUsageError("attempt to migrate VM that isn't booted")
         for server, vms in self._alloc.iteritems():
             if vm in vms:
@@ -377,9 +384,16 @@ class State(object):
             total_utilisation += weights[r] * utilisation
         return total_utilisation
 
-    def calculate_utilisations(self):
-        """Return dict server -> utilisation rate."""
-        return {server: self.utilisation(server) for server in self.servers}
+    def calculate_utilisations(self, weights=None):
+        """
+        Return dict server -> utilisation rate.
+        If weights are given return utilisation rate 
+        based on given weights
+        """
+        if weights is None:
+            return {server: self.utilisation(server) for server in self.servers}
+        else:
+            return {server: self.utilisation(server,weights) for server in self.servers}
 
     def calculate_prices(self):
         """Return dict vm -> price."""
@@ -642,6 +656,12 @@ class Schedule(object):
         (closed on the left, open on the right)
 
         """
+        # start = self.get_time()
+        # justabit = pd.offsets.Micro(1)
+        # end = start + self._period - justabit
+        # #TODO: if same vm booted & deleted at once, skip it
+        # return cleaned_requests(self._requests[start:end])
+
         if period is None:
             return self.actions.ix[t:]
         justabit = pd.offsets.Micro(1)

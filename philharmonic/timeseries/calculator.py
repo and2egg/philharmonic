@@ -70,9 +70,6 @@ def calculate_power_multicore(freq_scale, active_cores, max_cores, util_cores, m
    
     return total_power
 
-
-
-
 def calculate_price_old(power, price_file, start_date=None, old_parser=False):
     """parse prices from a price_file ($/kWh), realign it to start_date
     (if it's provided) and calculate the price of the energy consumption
@@ -106,7 +103,7 @@ def calculate_price_old(power, price_file, start_date=None, old_parser=False):
     total_price = h * sum(power*experiment_prices)
     return total_price
 
-def calculate_price(power, prices, start_date=None):
+def calculate_price(power, prices, start_date=None, transform_to_jouls=True, prices_in_mwh=False):
     """Take or parse from a file a series of electricity prices ($/kWh),
     realign it to start_date (if it's provided) and calculate the price of the
     energy consumption stored in a time series of power values power (W).
@@ -121,12 +118,18 @@ def calculate_price(power, prices, start_date=None):
     @Return: calculated price in $
 
     """
+
     if type(prices)==str: # let me parse that for you
         prices = parse_prices(prices) # TODO: fix for data frames
     # Now we say that our energy prices start on this date.
     if start_date: #TODO: fix for DataFrame
         prices = realign(prices, start_date)
-    prices = per_kwh2per_joul(prices) # convert into $/J
+
+    if prices_in_mwh:
+        prices = prices / 1000
+
+    if transform_to_jouls == True:
+        prices = per_kwh2per_joul(prices) # convert into $/J
 
     #TODO: replace this with resample() and pass integrate as a function
     # power.resample(prices.index.freq, how=calculate_energy, closed='both')*prices
@@ -135,16 +138,81 @@ def calculate_price(power, prices, start_date=None):
     #prices_list = [] # here we'll store prices during the experiment
     #for t in times: # TODO: add a changing h value (per hour) and charge per hour
     #    prices_list.append(prices.asof(t))
+    # prices.resample('H', how='mean')
+    # prices = prices.resample('5min', fill_method='pad')
     prices = prices.reindex(power.index, method='ffill')
 
     # we don't really know when the last interval ended, so we'll make a guess
     times = power.index
+
     N = float(len(times) + 1)
     t_0 = times[0]
     t_N = times[-1]+(times[-1]-times[-2])
     duration = (t_N - t_0)
     h = duration.total_seconds()/N
     total_price = h * (power * prices).sum()
+    #---
+    return total_price
+
+def calculate_price_new(power, prices, start_date=None, transform_to_jouls=True, prices_in_mwh=False):
+    """Take or parse from a file a series of electricity prices ($/kWh),
+    realign it to start_date (if it's provided) and calculate the price of the
+    energy consumption stored in a time series of power values power (W).
+    Should work for DataFrames too.
+
+    @param power: pandas.TimeSeries of power values
+    @param prices: pandas.TimeSeries of price values or a path to a
+    file to parse it from.
+    @param start_date: Timestamp to which to realign the prices
+    (e.g. the starting index value for the power series)
+
+    @Return: calculated price in $
+
+    """
+
+    if type(prices)==str: # let me parse that for you
+        prices = parse_prices(prices) # TODO: fix for data frames
+    # Now we say that our energy prices start on this date.
+    if start_date: #TODO: fix for DataFrame
+        prices = realign(prices, start_date)
+
+    if prices_in_mwh:
+        prices = prices / 1000
+
+    if transform_to_jouls == True:
+        prices = per_kwh2per_joul(prices) # convert into $/J
+
+    #TODO: replace this with resample() and pass integrate as a function
+    # power.resample(prices.index.freq, how=calculate_energy, closed='both')*prices
+    #---
+    #times = list(power.index)
+    #prices_list = [] # here we'll store prices during the experiment
+    #for t in times: # TODO: add a changing h value (per hour) and charge per hour
+    #    prices_list.append(prices.asof(t))
+    # prices.resample('H', how='mean')
+    # prices = prices.resample('5min', fill_method='pad')
+
+    # prices are given in $/kWh
+    # if a price is given as 0.027054 $/kWh and a machine is fully running for one hour at 200W
+    # it produces 200Wh for this period and the resulting price is 0.541 cent for one hour
+    # if it runs for a whole day at the same price it would result in 12.44 cent for 23 hours
+    prices = prices.reindex(power.index, method='ffill')
+
+    # we don't really know when the last interval ended, so we'll make a guess
+    times = power.index
+
+    # interval between two timestamps
+    interval = times[1] - times[0]
+    # intervals per hour, e.g. 12 intervals for 5 minute intervals
+    intervals_per_hour = 3600 / float(interval.seconds)
+
+    # transform the Watts into kiloWatts (kW)
+    power = power / 1000
+    # the given power value in kW is not applied to a full hour
+    # but to a different time interval, e.g. 5 minutes
+    # thus, if the machine runs on 150W then it needs in 5 minutes 150Wh / 12 = 12.5Wh = 0.0125kWh
+    power = power / intervals_per_hour
+    total_price = (power * prices).sum()
     #---
     return total_price
 
