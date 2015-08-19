@@ -149,6 +149,8 @@ factory = {
     ### no error
     "SD_el": 0,
     "SD_temp": 0,
+
+    "real_forecasts": False,
     ### small error
     #"SD_el": 0.01,
     #"SD_temp": 1.41,

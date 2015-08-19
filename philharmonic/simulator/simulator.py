@@ -143,7 +143,11 @@ class Simulator(IManager):
                                                     self.factory['temperature'])
         SD_el = self.factory['SD_el'] if 'SD_el' in self.factory  else 0
         SD_temp = self.factory['SD_temp'] if 'SD_temp' in self.factory  else 0
-        self.environment.model_forecast_errors(SD_el, SD_temp)
+        forecast_periods = self.factory['forecast_periods'] if 'forecast_periods' in self.factory  else 5
+        if self.factory['real_forecasts']:
+            self.environment.get_real_forecasts(forecast_periods)
+        else:
+            self.environment.model_forecast_errors(SD_el, SD_temp)
         self.real_schedule = Schedule()
 
     def apply_actions(self, actions):

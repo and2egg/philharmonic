@@ -51,7 +51,6 @@ class SimpleScheduler(IScheduler):
         
         for t_req, request in requests.iteritems():
         # for request in requests:
-            import ipdb; ipdb.set_trace()
             if request.what == 'boot':
 
                 server = self.find_host(request.vm)

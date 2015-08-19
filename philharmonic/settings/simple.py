@@ -68,6 +68,11 @@ factory['temperature'] = None
 factory['scheduler'] = 'SimpleScheduler'
 factory['environment'] = 'SimpleSimulatedEnvironment'
 
+factory['forecast_periods'] = 5
+factory['SD_el'] = 0.2
+factory['real_forecasts'] = True
+
+
 # plotting on server, no X server session
 plotserver = False
 

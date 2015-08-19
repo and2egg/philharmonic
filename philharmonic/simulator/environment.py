@@ -91,12 +91,58 @@ class SimulatedEnvironment(Environment):
         return el_prices, temperature
 
     def _generate_forecast(self, data, SD):
-        return data + SD * np.random.randn(*data.shape)
+        return data + SD * np.random.randn(*data.shape) # data.shape returns the dimensions of the data matrix
+                                                        # to be able to add to the existing matrix
 
     def model_forecast_errors(self, SD_el, SD_temp):
         self.forecast_el = self._generate_forecast(self.el_prices, SD_el)
         if not self.temperature is None:
             self.forecast_temp = self._generate_forecast(self.temperature, SD_temp)
+
+    def get_forecast_data(self, t):
+        el_prices = self.forecast_data_map[t]
+        return el_prices
+
+    def _get_forecast_values(self, price, horizon): 
+        dummy_vals = range(int(price+1), int(price + horizon+1)) # dummy values for forecasts
+        return dummy_vals
+
+    def _generate_forecast_map(self, el_prices, forecast_periods=5, forecast_freq='H'):
+        """ Generate a map to assign forecast values to each timestamp
+            1. create mapping -> timestamp to DataFrame
+            2. iterate through each timestamp
+            3. At each timestamp add forecasts for each location to DataFrame
+                  for given forecast_periods (fc horizon)
+            4. Return mapping over simlation period
+
+        """
+        locations = el_prices.axes[1]
+        price_df_list = []
+        
+        #iterate through all simulation times
+        for index, prices in el_prices.iterrows():
+            # TODO Andreas: change unit depending on forecast_freq
+            ind = index + pd.DateOffset(hours=1)
+            ind = pd.date_range(start=ind, periods=forecast_periods, freq=forecast_freq)
+            price_df = pd.DataFrame(index=ind, columns=locations)
+            for loc in locations:
+                price = prices[loc]
+                values = self._get_forecast_values(price, forecast_periods)
+                price_df[loc] = values
+            
+            # add to df list
+            price_df_list.append(price_df)
+
+        data_map = pd.DataFrame(index=el_prices.index,
+                                data={'values': price_df_list})
+        # Sample df entry retrieval
+        # idx = pd.Timestamp('2014-07-07 00:00:00')  # or just '2014-07-07 00:00:00'
+        # print "map at index {}: {}".format(idx, data_map.loc[idx]['values'])
+        return data_map
+
+    def get_real_forecasts(self, forecast_periods=5, forecast_freq='H'):
+        print("get real forecasts for {} periods".format(forecast_periods))
+        self.forecast_data_map = self._generate_forecast_map(self.el_prices, forecast_periods, forecast_freq)
 
 class PPSimulatedEnvironment(SimulatedEnvironment):
     """Peak pauser simulation scenario with one location, el price"""
