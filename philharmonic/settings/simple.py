@@ -14,7 +14,7 @@ inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 16 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 100
+inputgen_settings['VM_num'] = 10
 inputgen_settings['min_cpu'] = 4 # 2,
 inputgen_settings['max_cpu'] = 4 # 4,
 inputgen_settings['min_ram'] = 2 # 4,
@@ -26,8 +26,11 @@ inputgen_settings['max_ram'] = 2 # 16,
 # inputgen_settings['min_duration'] = 60 * 5 # 5 minute
 # inputgen_settings['min_duration'] = 60 * 5 # 5 minute
 
-inputgen_settings['min_duration'] = 60 * 60 # 1 hour
-inputgen_settings['max_duration'] = 60 * 60 * 3 # 3 hours
+# inputgen_settings['min_duration'] = 60 * 60 # 1 hour
+# inputgen_settings['max_duration'] = 60 * 60 * 3 # 3 hours
+
+inputgen_settings['min_duration'] = 60 * 60 * 5 # 5 hours
+inputgen_settings['max_duration'] = 60 * 60 * 5 # 5 hours
 
 # inputgen_settings['min_duration'] = 60, # 1 minute
 # inputgen_settings['max_duration'] = 60 * 60 * 10, # ten hours
@@ -71,6 +74,7 @@ factory['environment'] = 'SimpleSimulatedEnvironment'
 factory['forecast_periods'] = 5
 factory['SD_el'] = 0.2
 factory['real_forecasts'] = True
+factory['local_forecasts'] = False
 
 
 # plotting on server, no X server session

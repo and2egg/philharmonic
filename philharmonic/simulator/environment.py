@@ -80,6 +80,9 @@ class SimulatedEnvironment(Environment):
         """
         if forecast and hasattr(self, 'forecast_el'):
             el_prices = self.forecast_el[self.t:self.forecast_end]
+            el_prices[self.t] = self.el_prices[self.t]
+        elif forecast and hasattr(self, 'forecast_data_map'):
+            el_prices = self.forecast_data_map[self.t]['values']
         else:
             el_prices = self.el_prices[self.t:self.forecast_end]
 
@@ -99,12 +102,33 @@ class SimulatedEnvironment(Environment):
         if not self.temperature is None:
             self.forecast_temp = self._generate_forecast(self.temperature, SD_temp)
 
+    def _retrieve_forecasts(self):
+        # retrieve forecasts from web service
+        import urllib2
+        url = 'http://localhost:8081/em-app/rest/r/forecastAll/1,3,4/14/2014-07-07/2014-07-10'
+        response = urllib2.urlopen(url).read()
+        with open("csvData.csv", "w") as csv_file:
+            csv_file.write(response)
+        df = pd.read_csv('csvData.csv', engine='python', parse_dates=[0], escapechar='\\', index_col=0)
+        return df
+
+    def get_real_forecasts(self):
+        print("get real forecasts for simulation period (REST interface)")
+        self.forecast_el = self._retrieve_forecasts()
+
     def get_forecast_data(self, t):
         el_prices = self.forecast_data_map[t]
         return el_prices
 
     def _get_forecast_values(self, price, horizon): 
+        return self._get_forecast_dummy_values(price, 0.1, horizon)
+
+    def _get_forecast_dummy_values(self, price, SD, horizon): 
         dummy_vals = range(int(price+1), int(price + horizon+1)) # dummy values for forecasts
+        # dummy_vals = []
+        # for i in range(1,horizon):
+        #     val = price + SD * np.random.random()
+        #     dummy_vals.append(val)
         return dummy_vals
 
     def _generate_forecast_map(self, el_prices, forecast_periods=5, forecast_freq='H'):
@@ -121,7 +145,7 @@ class SimulatedEnvironment(Environment):
         
         #iterate through all simulation times
         for index, prices in el_prices.iterrows():
-            # TODO Andreas: change unit depending on forecast_freq
+            # start with the next hour
             ind = index + pd.DateOffset(hours=1)
             ind = pd.date_range(start=ind, periods=forecast_periods, freq=forecast_freq)
             price_df = pd.DataFrame(index=ind, columns=locations)
@@ -140,7 +164,7 @@ class SimulatedEnvironment(Environment):
         # print "map at index {}: {}".format(idx, data_map.loc[idx]['values'])
         return data_map
 
-    def get_real_forecasts(self, forecast_periods=5, forecast_freq='H'):
+    def get_real_forecast_map(self, forecast_periods=5, forecast_freq='H'):
         print("get real forecasts for {} periods".format(forecast_periods))
         self.forecast_data_map = self._generate_forecast_map(self.el_prices, forecast_periods, forecast_freq)
 
@@ -207,6 +231,27 @@ class GASimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
     pass
 
 class SimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
-    pass
+    def get_end_request_for(self, vm):
+        start = self.start
+        end = self.end
+        requests = self._requests
+        request = set([req.vm for req in requests.values if req.what == 'delete' and req.vm == vm])
+        return request
 
-    
+    def get_remaining_duration(self, vm):
+        start = self.get_time()
+        end = self.end
+
+        requests = self._requests[start:end]
+
+        for t, req in requests.iteritems():
+            if req.what == 'delete' and req.vm == vm:
+                end = t
+                break
+
+        # e.g. duration of 3 hours:
+        # datetime.timedelta(0, 10800)
+        duration = end - start
+        return duration
+
+

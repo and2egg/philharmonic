@@ -614,6 +614,10 @@ def el_prices_from_conf():
     el_prices = parse_dataset(conf.el_price_dataset, conf.date_parser)
     return el_prices
 
+def forecast_el_from_conf():
+    forecast_el = parse_dataset(conf.el_price_forecast)
+    return forecast_el
+
 def temperature_from_conf():
     temperature = parse_dataset(conf.temperature_dataset)
     return temperature

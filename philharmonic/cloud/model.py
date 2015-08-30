@@ -262,7 +262,6 @@ class State(object):
     def migrate(self, vm, s):
         """change current state to have vm in s instead of the old location"""
         if vm not in self.vms:
-            import ipdb; ipdb.set_trace()
             raise ModelUsageError("attempt to migrate VM that isn't booted")
         for server, vms in self._alloc.iteritems():
             if vm in vms:

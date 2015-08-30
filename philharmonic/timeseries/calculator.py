@@ -8,6 +8,8 @@ temperature time series datao. Additionally some functions for converting
 currencies etc.
 '''
 
+import math
+
 from historian import *
 from scipy import integrate
 
@@ -41,6 +43,31 @@ def calculate_power_freq(ut, f=2000, P_idle=100, P_base=150,
     P[P>0] += P_idle
     return P
 
+
+
+alpha = 0.512
+beta = 20.165
+E_mig = lambda V_mig : alpha*V_mig + beta
+V_mig = lambda V_mem, R, D, n : V_mem * (1-(D/float(R))**(n+1))/(1-D/float(R))
+T_mig = lambda V_mig, R : V_mig/(R/8.) # R assumed to be in Mb/s
+# constants
+R, D = 1000, 300
+V_thd = 100 # MB; treshold after which post-copying starts
+
+
+def calculate_migration_cost(vm, price_before, price_after):
+    mean_el_price = (price_before + price_after) / 2.
+    memory = vm.res['RAM'] * 1000 # MB
+    try:
+        n = int(math.ceil(math.log(V_thd/float(memory),
+                                   D/float(R))))
+    except ZeroDivisionError:
+        n = 1 # TODO: check what raises this error
+    migration_data = V_mig(memory, R, D, n)
+    energy = E_mig(migration_data) # Joules
+    energy = joul2kwh(energy) # kWh
+    cost = energy * mean_el_price
+    return cost
 
 
 def calculate_util(active_cores, util_active_cores):

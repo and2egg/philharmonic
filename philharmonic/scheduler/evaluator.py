@@ -130,9 +130,9 @@ def calculate_cloud_cost(power, el_prices):
         loc = server.loc
         el_prices_loc[server] = el_prices[loc][start:end]
     jouls = conf.transform_to_jouls
-    mwh = conf.prices_in_mwh
+    # mwh = conf.prices_in_mwh
     if conf.alternate_cost_model:
-        cost = ph.calculate_price_new(power, el_prices_loc, transform_to_jouls=jouls, prices_in_mwh=mwh)
+        cost = ph.calculate_price_new(power, el_prices_loc, transform_to_jouls=jouls)
     else:
         cost = ph.calculate_price(power, el_prices_loc)#ph.calculate_price_mean(power, el_prices_loc)
     return cost
@@ -393,6 +393,8 @@ def calculate_migration_overhead(cloud, environment, schedule,
             cloud.apply(action)
             after = cloud.get_current()
             host_after = after.allocation(action.vm)
+
+            t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour+1)
             #if host_before or host_after is None, it's a boot/delete
             if (action.name == 'migrate' and host_before and
                 host_after and host_before != host_after):
@@ -409,7 +411,6 @@ def calculate_migration_overhead(cloud, environment, schedule,
                 migration_data = V_mig(memory, R, D, n)
                 energy = E_mig(migration_data) # Joules
                 energy = ph.joul2kwh(energy) # kWh
-                import ipdb; ipdb.set_trace()
                 total_energy += energy
                 cost = energy * mean_el_price
                 total_cost += cost

@@ -136,6 +136,8 @@ class Simulator(IManager):
         super(Simulator, self).__init__()
         self.environment.el_prices = self._create(inputgen,
                                                   self.factory['el_prices'])
+        if conf.prices_in_mwh:
+            self.environment.el_prices = self.environment.el_prices / 1000
         if self.factory['temperature'] is None:
             self.environment.temperature = None
         else:
@@ -143,11 +145,22 @@ class Simulator(IManager):
                                                     self.factory['temperature'])
         SD_el = self.factory['SD_el'] if 'SD_el' in self.factory  else 0
         SD_temp = self.factory['SD_temp'] if 'SD_temp' in self.factory  else 0
-        forecast_periods = self.factory['forecast_periods'] if 'forecast_periods' in self.factory  else 5
-        if self.factory['real_forecasts']:
-            self.environment.get_real_forecasts(forecast_periods)
+        forecast_periods = self.factory['forecast_periods'] if 'forecast_periods' in self.factory else 12
+        if self.factory['local_forecasts']:
+            self.environment.forecast_el = self._create(inputgen,
+                                                  self.factory['forecast_el'])
+        elif self.factory['real_forecasts']:
+            self.environment.get_real_forecasts()
+        elif self.factory['real_forecast_map']:
+            self.environment.get_real_forecast_map(forecast_periods)
         else:
             self.environment.model_forecast_errors(SD_el, SD_temp)
+        if conf.prices_in_mwh:
+            self.environment.forecast_el = self.environment.forecast_el / 1000
+
+        print self.environment.forecast_el.head()
+        print ""
+
         self.real_schedule = Schedule()
 
     def apply_actions(self, actions):

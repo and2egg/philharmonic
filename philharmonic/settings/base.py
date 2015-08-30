@@ -85,6 +85,7 @@ if not MIXED:
     el_price_dataset = os.path.join(DATA_LOC, 'prices.csv')
 else:
     el_price_dataset = os.path.join(DATA_LOC, 'prices_da.csv')
+    el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc.csv')
 
 date_parser = None
 
@@ -151,6 +152,7 @@ factory = {
     "SD_temp": 0,
 
     "real_forecasts": False,
+    "real_forecast_map": False,
     ### small error
     #"SD_el": 0.01,
     #"SD_temp": 1.41,
@@ -182,7 +184,12 @@ factory = {
     #  simple_temperature, medium_temperature, usa_temperature,
     #  world_temperature, dynamic_usa_temp
     "el_prices": "el_prices_from_conf",
+    # will be read when "local_forecasts" is True
+    "forecast_el": "forecast_el_from_conf",
     "temperature": "temperature_from_conf",
+
+    # set to True if forecasts should be read from file
+    "local_forecasts": True,
 
     # Driver that takes the manager's actions and controls the cloud:
     #  nodriver (no actions)

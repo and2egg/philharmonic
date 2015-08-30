@@ -51,7 +51,6 @@ class FBFScheduler(IScheduler):
 
                 server = self.find_host(request.vm)
                 if server is None:
-                    import ipdb; ipdb.set_trace()
                     raise Exception("not enough free resources")
                 action = Migration(request.vm, server)
                 self.cloud.apply(action)
