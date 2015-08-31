@@ -4,6 +4,22 @@ from philharmonic import conf
 
 output_folder = os.path.join(base_output_folder, "simple/")
 
+
+
+# scheduler configuration
+
+# possible scenarios: 
+# 1) not cost aware (random assignments, migrations based on load?)
+# 2) cost aware request scheduling (take cheapest dc?)
+# 3) cost aware request scheduling + forecast (take cheapest dc?)
+# 4) cost aware migrations (take cheapest dc?)
+# 5) cost aware migrations + forecast (take cheapest dc?)
+
+simpleconf = {
+	'scenario': 2
+}
+
+
 # Input gen settings
 
 inputgen_settings['resource_distribution'] = 'normal'
@@ -14,7 +30,7 @@ inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 16 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 10
+inputgen_settings['VM_num'] = 20
 inputgen_settings['min_cpu'] = 4 # 2,
 inputgen_settings['max_cpu'] = 4 # 4,
 inputgen_settings['min_ram'] = 2 # 4,
@@ -69,12 +85,14 @@ show_cloud_interval = None
 factory['temperature'] = None
 
 factory['scheduler'] = 'SimpleScheduler'
+factory['scheduler_conf'] = simpleconf
 factory['environment'] = 'SimpleSimulatedEnvironment'
 
 factory['forecast_periods'] = 5
 factory['SD_el'] = 0.2
 factory['real_forecasts'] = True
-factory['local_forecasts'] = False
+factory['local_forecasts'] = True
+factory['clean_requests'] = False
 
 
 # plotting on server, no X server session

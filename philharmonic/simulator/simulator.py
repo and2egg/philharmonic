@@ -204,7 +204,20 @@ class Simulator(IManager):
             # get requests & update model
             # these are the event triggers
             # - we find any requests that might arise in this interval
-            requests = self.environment.get_requests()
+            if self.factory['clean_requests']:
+                requests = self.environment.get_requests(clean=True)
+            else:
+                requests = self.environment.get_requests(clean=False)
+            # requests = self.environment.get_request_type('boot')
+
+            # check if schedule is already defined
+            # then apply previously planned actions
+            if 'schedule' in locals():
+                actions = schedule.filter_current_actions(t, period)
+                if len(actions) > 0:
+                    debug('Applying Planned Actions:\n{}\n'.format(actions))
+                    self.apply_actions(actions)
+
             # - apply requests on the simulated cloud
             self.apply_actions(requests)
             # call scheduler to decide on actions

@@ -177,6 +177,9 @@ factory = {
     # offset by which to shift requests (None for no shifting)
     # - mostly just for use by the explorer
     "requests_offset": None,
+    # state whether requests that last shorter than one period
+    # should be deleted
+    'clean_requests': True,
     # Geotemporal inputs. *_from_conf recommended
     # (they read CSV files located at conf.*_dataset)
     # Can also be:

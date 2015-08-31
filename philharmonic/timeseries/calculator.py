@@ -47,10 +47,14 @@ def calculate_power_freq(ut, f=2000, P_idle=100, P_base=150,
 
 alpha = 0.512
 beta = 20.165
+# migration energy
 E_mig = lambda V_mig : alpha*V_mig + beta
+# migration volume
 V_mig = lambda V_mem, R, D, n : V_mem * (1-(D/float(R))**(n+1))/(1-D/float(R))
+# migration time
 T_mig = lambda V_mig, R : V_mig/(R/8.) # R assumed to be in Mb/s
 # constants
+# Bandwidth, data per chunk?
 R, D = 1000, 300
 V_thd = 100 # MB; treshold after which post-copying starts
 
@@ -63,6 +67,7 @@ def calculate_migration_cost(vm, price_before, price_after):
                                    D/float(R))))
     except ZeroDivisionError:
         n = 1 # TODO: check what raises this error
+    # Typically add 1/3 of memory to get migration data
     migration_data = V_mig(memory, R, D, n)
     energy = E_mig(migration_data) # Joules
     energy = joul2kwh(energy) # kWh

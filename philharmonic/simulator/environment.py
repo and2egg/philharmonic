@@ -220,12 +220,27 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
                             freq=self.period)
         return idx
 
-    def get_requests(self):
+    def get_requests(self, clean=True):
         start = self.get_time()
         justabit = pd.offsets.Micro(1)
         end = start + self._period - justabit
-        #TODO: if same vm booted & deleted at once, skip it
-        return cleaned_requests(self._requests[start:end])
+        if clean:
+            #TODO: if same vm booted & deleted at once, skip it
+            return cleaned_requests(self._requests[start:end])
+        else:
+            return self._requests[start:end]
+
+    def get_request_type(self, what, clean=True):
+        """Get requests for type 'what'
+        which is either 'boot' or 'delete' """
+        start = self.get_time()
+        justabit = pd.offsets.Micro(1)
+        end = start + self._period - justabit
+        requ_vms = set([req.vm for req in self._requests.values if req.what == what])
+        if clean:
+            return cleaned_requests(requ_vms[start:end])
+        else:
+            return requ_vms[start:end]
 
 class GASimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
     pass
@@ -238,12 +253,18 @@ class SimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
         request = set([req.vm for req in requests.values if req.what == 'delete' and req.vm == vm])
         return request
 
-    def get_remaining_duration(self, vm):
-        start = self.get_time()
+    def get_remaining_duration(self, vm, t=None):
+        if t is None:
+            start = self.get_time()
+        else:
+            start = t
         end = self.end
 
         requests = self._requests[start:end]
 
+        # iterate through remaining requests
+        # to get the time of the corresponding 
+        # 'delete' action
         for t, req in requests.iteritems():
             if req.what == 'delete' and req.vm == vm:
                 end = t

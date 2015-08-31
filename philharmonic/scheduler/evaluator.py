@@ -61,6 +61,7 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
             times = []
         # TODO: precise indexing, not dict
         if isinstance(schedule.actions[t], pd.Series):
+            
             for action in schedule.actions[t].values:
                 cloud.apply(action)
         else:
