@@ -502,6 +502,18 @@ def get_data_loc_mixed(filename):
 def get_data_loc_world(filename):
     return os.path.join(conf.DATA_LOC_WORLD, filename)
 
+def mixed_2_loc(filepath=None):
+    if filepath is None:
+        filepath = get_data_loc_mixed('prices_da_2_loc.csv')
+    el_prices = parse_dataset(filepath, conf.date_parser)
+    return el_prices
+
+def mixed_2_loc_fc(filepath=None):
+    if filepath is None:
+        filepath = get_data_loc_mixed('prices_da_2_loc_fc.csv')
+    forecast_el = parse_dataset(filepath)
+    return forecast_el
+
 def usa_el(start=None, filepath=None):
     if filepath is None:
         filepath = get_data_loc_usa('prices.csv')
@@ -649,7 +661,11 @@ def generate_fixed_input():
 
     """
     _override_settings()
-    df = parse_dataset(location_dataset)
+    if conf.dynamic_locations:
+        get_locations = globals()[conf.factory['el_prices']]
+        df = get_locations()
+    else:
+        df = parse_dataset(location_dataset)
     locations = df.columns.values
     start, end = conf.start, conf.end
     info('Generating input datasets\n-------------------------\nParameters:\n' +

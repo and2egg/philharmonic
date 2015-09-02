@@ -12,11 +12,12 @@ output_folder = os.path.join(base_output_folder, "simple/")
 # 1) not cost aware (random assignments, migrations based on load?)
 # 2) cost aware request scheduling (take cheapest dc?)
 # 3) cost aware request scheduling + forecast (take cheapest dc?)
-# 4) cost aware migrations (take cheapest dc?)
-# 5) cost aware migrations + forecast (take cheapest dc?)
+# 4) cost aware requests and migrations (take cheapest dc?)
+# 5) cost aware requests and migrations + forecast (take cheapest dc?)
+# 6) cost aware requests and migrations + ideal forecast (take cheapest dc?)
 
 simpleconf = {
-	'scenario': 2
+	'scenario': 6
 }
 
 
@@ -64,6 +65,8 @@ ignore_ram = True
 
 add_date_to_folders = True
 
+dynamic_locations = True
+
 prompt_configuration = True
 
 show_pm_frequencies = False
@@ -71,6 +74,10 @@ show_pm_frequencies = False
 power_freq_model = False
 
 power_randomize = False
+
+save_power = True
+
+save_util = True
 
 transform_to_jouls = False
 
@@ -82,6 +89,10 @@ alternate_cost_model = True
 
 show_cloud_interval = None
 
+# possible values: el_prices_from_conf, mixed_2_loc
+factory['el_prices'] = 'mixed_2_loc'
+# possible values: forecast_el_from_conf, mixed_2_loc_fc
+factory['forecast_el'] = 'mixed_2_loc_fc'
 factory['temperature'] = None
 
 factory['scheduler'] = 'SimpleScheduler'

@@ -14,7 +14,7 @@ import copy
 import itertools
 
 from philharmonic.utils import deprecated, CommonEqualityMixin
-from . import visualiser
+from philharmonic.cloud import visualiser
 
 def format_spec(spec):
     """Return a string containing the resource

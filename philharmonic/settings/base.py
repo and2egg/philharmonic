@@ -21,6 +21,7 @@ historical_en_prices = "./io/energy_price/train/3month.csv"
 #historical_en_prices = "./io/energy_price_data-single_day.csv"
 
 save_power = False
+save_util = False
 #----------------------
 
 # stop and check settings with user (only initially)
@@ -86,6 +87,8 @@ if not MIXED:
 else:
     el_price_dataset = os.path.join(DATA_LOC, 'prices_da.csv')
     el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc.csv')
+
+dynamic_locations = False
 
 date_parser = None
 
@@ -221,6 +224,7 @@ inputgen_settings = {
     'resource_distribution': 'uniform',
 
     # cloud's servers
+    # now not used anymore. @see inputgen.generate_fixed_input()
     'location_dataset': el_price_dataset,
     # 'location_dataset': usa_el
     #'server_num': 3,

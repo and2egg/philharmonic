@@ -30,6 +30,11 @@ def generate_series_results(cloud, env, schedule, nplots):
     util = evaluator.calculate_cloud_utilisation(cloud, env, schedule)
     info('Utilisation (%)')
     info(str(util * 100))
+
+    if conf.save_util:
+        # fill it out to the full frequency
+        util_sampled = util.resample(conf.power_freq, fill_method='pad')
+        util_sampled.to_pickle(output_loc('util.pkl'))
     #print('- weighted mean per no')
     # weighted_mean(util[util>0])
     #util[util>0].mean().dropna().mean() * 100
