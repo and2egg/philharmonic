@@ -143,6 +143,7 @@ class Simulator(IManager):
         else:
             self.environment.temperature = self._create(inputgen,
                                                     self.factory['temperature'])
+        self.environment.locations = list(self.environment.el_prices.columns.values)
         SD_el = self.factory['SD_el'] if 'SD_el' in self.factory  else 0
         SD_temp = self.factory['SD_temp'] if 'SD_temp' in self.factory  else 0
         forecast_periods = self.factory['forecast_periods'] if 'forecast_periods' in self.factory else 12
@@ -158,6 +159,7 @@ class Simulator(IManager):
         if conf.prices_in_mwh:
             self.environment.forecast_el = self.environment.forecast_el / 1000
 
+        print "start of forecast values: "
         print self.environment.forecast_el.head()
         print ""
 

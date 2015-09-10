@@ -667,6 +667,10 @@ def generate_fixed_input():
     else:
         df = parse_dataset(location_dataset)
     locations = df.columns.values
+    ## TEST: assign locations directly
+    ## works, but in the simulation locations are still
+    ## retrieved by columns of prices
+    # locations = ['Helsinki','Portland']
     start, end = conf.start, conf.end
     info('Generating input datasets\n-------------------------\nParameters:\n' +
          '- location_dataset: {}\n'.format(location_dataset) +

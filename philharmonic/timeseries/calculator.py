@@ -225,9 +225,6 @@ def calculate_price_new(power, prices, start_date=None, transform_to_jouls=True,
     # power.resample(prices.index.freq, how=calculate_energy, closed='both')*prices
     #---
     #times = list(power.index)
-    #prices_list = [] # here we'll store prices during the experiment
-    #for t in times: # TODO: add a changing h value (per hour) and charge per hour
-    #    prices_list.append(prices.asof(t))
     # prices.resample('H', how='mean')
     # prices = prices.resample('5min', fill_method='pad')
 

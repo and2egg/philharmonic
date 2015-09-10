@@ -17,7 +17,7 @@ output_folder = os.path.join(base_output_folder, "simple/")
 # 6) cost aware requests and migrations + ideal forecast (take cheapest dc?)
 
 simpleconf = {
-	'scenario': 6
+	'scenario': 5
 }
 
 
@@ -25,7 +25,7 @@ simpleconf = {
 
 inputgen_settings['resource_distribution'] = 'normal'
 
-inputgen_settings['server_num'] = 3
+inputgen_settings['server_num'] = 6
 inputgen_settings['min_server_cpu'] = 8 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 16 # 32,

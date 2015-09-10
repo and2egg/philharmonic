@@ -34,7 +34,7 @@ def print_history(cloud, environment, schedule):
 # TODO: add optional start, end limiters for evaluating a certain period
 
 def calculate_cloud_utilisation(cloud, environment, schedule,
-                                start=None, end=None):
+                                start=None, end=None, locationBased=False):
     """Calculate utilisations of all servers based on the given schedule.
 
     @param start, end: if given, only this period will be counted,
@@ -49,6 +49,7 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
         cloud.reset_to_real()
     if end is None:
         end = environment.end
+
     #TODO: use more precise pandas methods for indexing (performance)
     #TODO: maybe move some of this state iteration functionality into Cloud
     #TODO: see where schedule window should be propagated - here or Scheduler?
@@ -68,7 +69,10 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
             action = schedule.actions[t]
             cloud.apply(action)
         state = cloud.get_current()
-        new_utilisations = state.calculate_utilisations()
+        if locationBased:
+            new_utilisations = state.calculate_utilisations_per_location()
+        else:
+            new_utilisations = state.calculate_utilisations()
         utilisations_list.append(new_utilisations)
         times.append(t)
     if times[-1] < end:
@@ -77,6 +81,7 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
         utilisations_list.append(utilisations_list[-1])
     df_util = pd.DataFrame(utilisations_list, times)
     return df_util
+
 
 def precreate_synth_power(start, end, servers):
     # P_peak = conf.P_peak
@@ -122,23 +127,26 @@ def generate_cloud_power(util, start=None, end=None,
         power[power > 0] += conf.P_std * np.random.randn(*power.shape)
     return power
 
-def calculate_cloud_cost(power, el_prices):
+def calculate_cloud_cost(power, el_prices, locationBased=False):
     """Take power and el. prices DataFrames & calc. the el. cost."""
     start = power.index[0]
     end= power.index[-1]
     el_prices_loc = pd.DataFrame()
-    for server in power.columns: # this might be very inefficient
-        loc = server.loc
-        el_prices_loc[server] = el_prices[loc][start:end]
+    if locationBased:
+        for loc in power.columns.values: 
+            el_prices_loc[loc] = el_prices[loc][start:end]
+    else:
+        for server in power.columns: # this might be very inefficient
+            loc = server.loc
+            el_prices_loc[server] = el_prices[loc][start:end]
     jouls = conf.transform_to_jouls
-    # mwh = conf.prices_in_mwh
     if conf.alternate_cost_model:
         cost = ph.calculate_price_new(power, el_prices_loc, transform_to_jouls=jouls)
     else:
         cost = ph.calculate_price(power, el_prices_loc)#ph.calculate_price_mean(power, el_prices_loc)
     return cost
 
-def calculate_cloud_cooling(power, temperature):
+def calculate_cloud_cooling(power, temperature, locationBased=False):
     """Take power and temperature DataFrames & calculate the power with
     cooling overhead.
 
@@ -146,9 +154,13 @@ def calculate_cloud_cooling(power, temperature):
     start = power.index[0]
     end= power.index[-1]
     temperature_server = pd.DataFrame()
-    for server in power.columns: # this might be very inefficient
-        loc = server.loc
-        temperature_server[server] = temperature[loc][start:end]
+    if locationBased:
+        for loc in power.columns.values: 
+            temperature_server[loc] = temperature[loc][start:end]
+    else:
+        for server in power.columns: # this might be very inefficient
+            loc = server.loc
+            temperature_server[server] = temperature[loc][start:end]
     #cost = ph.calculate_price(power, el_prices_loc)
     power_with_cooling = ph.calculate_cooling_overhead(power,
                                                        temperature_server)
@@ -173,14 +185,14 @@ def _worst_case_power(cloud, environment, start, end): # TODO: use this
     full_power = generate_cloud_power(full_util, freq=full_freq)
 
 def combined_cost(cloud, environment, schedule, el_prices, temperature=None,
-                  start=None, end=None):
+                  start=None, end=None, locationBased=False):
     """Calculate energy costs including IT equipment energy cooling overhead and
     the real-time electricity price."""
 
     # we first calculate utilisation/freq with start, end = None / timestamp
     # this way it knows which state to start from
     # (this is a temp. hack until cloud states get timestamped)
-    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end)
+    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end, locationBased)
     if conf.power_freq_model:
         freq = calculate_cloud_frequencies(
             cloud, environment, schedule, start, end
@@ -188,13 +200,19 @@ def combined_cost(cloud, environment, schedule, el_prices, temperature=None,
     else:
         freq = None
     power = generate_cloud_power(util, freq=freq)
+    if locationBased:
+        locations = list(power.columns.values)
+        loc_array = [ server.loc for server in cloud.servers ]
+        for loc in locations:
+            servers_per_loc = loc_array.count(loc)
+            power[loc] *= servers_per_loc
     if start is None:
         start = environment.start
     if end is None:
         end = environment.end
     if temperature is not None:
-        power = calculate_cloud_cooling(power, temperature[start:end])
-    cost = calculate_cloud_cost(power, el_prices[start:end])
+        power = calculate_cloud_cooling(power, temperature[start:end], locationBased)
+    cost = calculate_cloud_cost(power, el_prices[start:end], locationBased)
     total_cost = cost.sum() # for the whole cloud
     return total_cost
 
@@ -228,7 +246,7 @@ def normalised_combined_cost(cloud, environment, schedule,
     return normalised
 
 def combined_energy(cloud, environment, schedule, temperature=None,
-                    start=None, end=None):
+                    start=None, end=None, locationBased=False):
     """Calculate energy of IT equipment and cooling if temperature provided.
 
     @returns: energy in kWh
@@ -238,7 +256,7 @@ def combined_energy(cloud, environment, schedule, temperature=None,
     # we first calculate utilisation with start, end = None / some timestamp
     # this way it knows which state to start from
     # (this is a temp. hack until cloud states get timestamped)
-    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end)
+    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end, locationBased)
     if start is None:
         start = environment.start
     if end is None:
@@ -249,8 +267,14 @@ def combined_energy(cloud, environment, schedule, temperature=None,
     else:
         freq = None
     power = generate_cloud_power(util, freq=freq)
+    if locationBased:
+        locations = list(power.columns.values)
+        loc_array = [ server.loc for server in cloud.servers ]
+        for loc in locations:
+            servers_per_loc = loc_array.count(loc)
+            power[loc] *= servers_per_loc
     if temperature is not None:
-        power = calculate_cloud_cooling(power, temperature[start:end])
+        power = calculate_cloud_cooling(power, temperature[start:end], locationBased)
     energy = ph.calculate_energy(power)
     energy_total = energy.sum() # for the whole cloud
     energy_total = ph.joul2kwh(energy_total)

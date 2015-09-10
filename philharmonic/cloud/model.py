@@ -383,6 +383,11 @@ class State(object):
             total_utilisation += weights[r] * utilisation
         return total_utilisation
 
+    def utilisation_per_location(self, loc, weights=None):
+        """Utilisation ratio of all servers at location loc."""
+        util = [self.utilisation(s, weights) for s in self.servers if s.loc=loc]
+        return sum(util) / float(len(util))
+
     def calculate_utilisations(self, weights=None):
         """
         Return dict server -> utilisation rate.
@@ -393,6 +398,16 @@ class State(object):
             return {server: self.utilisation(server) for server in self.servers}
         else:
             return {server: self.utilisation(server,weights) for server in self.servers}
+
+    def calculate_utilisations_per_location(self, weights=None):
+        """
+        Return dict location -> utilisation rate.
+        If weights are given return utilisation rate 
+        based on given weights
+        
+        """
+        locations = list(set([s.loc for s in self.servers]))
+        return {location: self.utilisation_per_location(loc, weights) for loc in locations}
 
     def calculate_prices(self):
         """Return dict vm -> price."""
