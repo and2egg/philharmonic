@@ -27,7 +27,10 @@ def generate_series_results(cloud, env, schedule, nplots):
     # cloud utilisation
     #------------------
     # evaluator.precreate_synth_power(env.start, env.end, cloud.servers)
-    util = evaluator.calculate_cloud_utilisation(cloud, env, schedule)
+    if conf.custom_weights is not None:
+        util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, weights=conf.custom_weights)
+    else:
+        util = evaluator.calculate_cloud_utilisation(cloud, env, schedule)
     info('Utilisation (%)')
     info(str(util * 100))
 

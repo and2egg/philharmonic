@@ -34,7 +34,7 @@ def print_history(cloud, environment, schedule):
 # TODO: add optional start, end limiters for evaluating a certain period
 
 def calculate_cloud_utilisation(cloud, environment, schedule,
-                                start=None, end=None, locationBased=False):
+                                start=None, end=None, weights=None, locationBased=False):
     """Calculate utilisations of all servers based on the given schedule.
 
     @param start, end: if given, only this period will be counted,
@@ -53,7 +53,7 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
     #TODO: use more precise pandas methods for indexing (performance)
     #TODO: maybe move some of this state iteration functionality into Cloud
     #TODO: see where schedule window should be propagated - here or Scheduler?
-    initial_utilisations = cloud.get_current().calculate_utilisations()
+    initial_utilisations = cloud.get_current().calculate_utilisations(weights)
     utilisations_list = [initial_utilisations]
     times = [start]
     for t in schedule.actions.index.unique():
@@ -70,9 +70,9 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
             cloud.apply(action)
         state = cloud.get_current()
         if locationBased:
-            new_utilisations = state.calculate_utilisations_per_location()
+            new_utilisations = state.calculate_utilisations_per_location(weights)
         else:
-            new_utilisations = state.calculate_utilisations()
+            new_utilisations = state.calculate_utilisations(weights)
         utilisations_list.append(new_utilisations)
         times.append(t)
     if times[-1] < end:
@@ -185,14 +185,14 @@ def _worst_case_power(cloud, environment, start, end): # TODO: use this
     full_power = generate_cloud_power(full_util, freq=full_freq)
 
 def combined_cost(cloud, environment, schedule, el_prices, temperature=None,
-                  start=None, end=None, locationBased=False):
+                  start=None, end=None, weights=None, locationBased=False):
     """Calculate energy costs including IT equipment energy cooling overhead and
     the real-time electricity price."""
 
     # we first calculate utilisation/freq with start, end = None / timestamp
     # this way it knows which state to start from
     # (this is a temp. hack until cloud states get timestamped)
-    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end, locationBased)
+    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end, weights, locationBased)
     if conf.power_freq_model:
         freq = calculate_cloud_frequencies(
             cloud, environment, schedule, start, end
@@ -246,7 +246,7 @@ def normalised_combined_cost(cloud, environment, schedule,
     return normalised
 
 def combined_energy(cloud, environment, schedule, temperature=None,
-                    start=None, end=None, locationBased=False):
+                    start=None, end=None, weights=None, locationBased=False):
     """Calculate energy of IT equipment and cooling if temperature provided.
 
     @returns: energy in kWh
@@ -256,7 +256,7 @@ def combined_energy(cloud, environment, schedule, temperature=None,
     # we first calculate utilisation with start, end = None / some timestamp
     # this way it knows which state to start from
     # (this is a temp. hack until cloud states get timestamped)
-    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end, locationBased)
+    util = calculate_cloud_utilisation(cloud, environment, schedule, start, end, weights, locationBased)
     if start is None:
         start = environment.start
     if end is None:
@@ -485,7 +485,7 @@ def _reset_cloud_state(cloud, environment, start=None, end=None):
 
 def evaluate(cloud, environment, schedule,
              el_prices, temperature=None,
-             start=None, end=None):
+             start=None, end=None, weights=None):
     """Calculate utilprice, sla and contstraint penalties
     of all servers based on the given schedule.
 
@@ -498,7 +498,7 @@ def evaluate(cloud, environment, schedule,
     #TODO: use more precise pandas methods for indexing (performance)
     #TODO: maybe move some of this state iteration functionality into Cloud
     #TODO: see where schedule window should be propagated - here or Scheduler?
-    initial_utilisations = cloud.get_current().calculate_utilisations()
+    initial_utilisations = cloud.get_current().calculate_utilisations(weights)
     utilisations_list = [initial_utilisations]
     times = [start]
 
@@ -539,7 +539,7 @@ def evaluate(cloud, environment, schedule,
                 raise
             cloud.apply(action, inplace=True)
         state = cloud.get_current()
-        new_utilisations = state.calculate_utilisations()
+        new_utilisations = state.calculate_utilisations(weights)
         utilisations_list.append(new_utilisations)
         times.append(t)
 

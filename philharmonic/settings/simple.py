@@ -102,7 +102,7 @@ factory['environment'] = 'SimpleSimulatedEnvironment'
 factory['forecast_periods'] = 5
 factory['SD_el'] = 0.2
 factory['real_forecasts'] = True
-factory['local_forecasts'] = True
+# factory['local_forecasts'] = True
 factory['clean_requests'] = False
 
 
@@ -128,3 +128,5 @@ start = pd.Timestamp('2014-07-07 00:00')
 # - two weeks
 times = pd.date_range(start, periods=24 * 1, freq='H')
 end = times[-1]
+
+custom_weights = {'RAM': 0, '#CPUs': 1}

@@ -1,6 +1,8 @@
 from philharmonic.scheduler.ischeduler import IScheduler
 from philharmonic import Schedule, Migration, VMRequest
 from philharmonic.logger import info, debug, error
+from philharmonic import conf
+
 import philharmonic as ph
 import pandas as pd
 import numpy as np
@@ -21,6 +23,7 @@ class SimpleScheduler(IScheduler):
         current = self.cloud.get_current()
         total_utilisation = 0.
         utilisations = {}
+
         for i in server.resource_types:
             used = 0.
             for existing_vm in current.alloc[server]:
@@ -30,8 +33,9 @@ class SimpleScheduler(IScheduler):
             utilisations[i] = used/server.cap[i]
             if used > server.cap[i]: # capacity exceeded for this resource
                 return -1
-        # take weight from class instead of the standard weight
-        weights = server._weights
+
+        # take custom weights from conf
+        weights = conf.custom_weights
         # uniform_weight = 1./len(server.resource_types)  
         # weights = {res : uniform_weight for res in server.resource_types}
         for resource_type, utilisation in utilisations.iteritems():

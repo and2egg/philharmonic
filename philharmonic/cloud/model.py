@@ -37,8 +37,8 @@ class ModelUsageError(Exception):
 # some non-semantic functionality common for VMs and servers
 class Machine(object):
     resource_types = ['RAM', '#CPUs'] # can be overridden
-    # _weights = None
-    _weights = {'RAM': 0, '#CPUs': 1}
+    _weights = None
+    # _weights = {'RAM': 0, '#CPUs': 1}
 
     # TODO_Andreas: ignore ram
     # if conf.ignore_ram:
@@ -384,8 +384,8 @@ class State(object):
         return total_utilisation
 
     def utilisation_per_location(self, loc, weights=None):
-        """Utilisation ratio of all servers at location loc."""
-        util = [self.utilisation(s, weights) for s in self.servers if s.loc=loc]
+        """Utilisation ratio (average) of all servers at location loc."""
+        util = [self.utilisation(s, weights) for s in self.servers if s.loc==loc]
         return sum(util) / float(len(util))
 
     def calculate_utilisations(self, weights=None):

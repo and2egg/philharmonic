@@ -147,12 +147,14 @@ class Simulator(IManager):
         SD_el = self.factory['SD_el'] if 'SD_el' in self.factory  else 0
         SD_temp = self.factory['SD_temp'] if 'SD_temp' in self.factory  else 0
         forecast_periods = self.factory['forecast_periods'] if 'forecast_periods' in self.factory else 12
-        if self.factory['local_forecasts']:
+        if 'local_forecasts' in self.factory and self.factory['local_forecasts'] == True:
+            if 'forecast_el' not in self.factory:
+                self.factory['forecast_el'] = 'forecast_el_from_conf'
             self.environment.forecast_el = self._create(inputgen,
                                                   self.factory['forecast_el'])
-        elif self.factory['real_forecasts']:
+        elif 'real_forecasts' in self.factory and self.factory['real_forecasts'] == True:
             self.environment.get_real_forecasts()
-        elif self.factory['real_forecast_map']:
+        elif 'real_forecast_map' in self.factory and self.factory['real_forecast_map'] == True:
             self.environment.get_real_forecast_map(forecast_periods)
         else:
             self.environment.model_forecast_errors(SD_el, SD_temp)
@@ -206,10 +208,9 @@ class Simulator(IManager):
             # get requests & update model
             # these are the event triggers
             # - we find any requests that might arise in this interval
-            if self.factory['clean_requests']:
-                requests = self.environment.get_requests(clean=True)
-            else:
-                requests = self.environment.get_requests(clean=False)
+            if 'clean_requests' not in self.factory:
+                self.factory['clean_requests'] = True
+            requests = self.environment.get_requests(clean=self.factory['clean_requests'])
             # requests = self.environment.get_request_type('boot')
 
             # check if schedule is already defined

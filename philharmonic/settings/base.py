@@ -103,6 +103,8 @@ start = pd.Timestamp('2010-06-03 00:00')
 times = pd.date_range(start, periods=24 * 7, freq='H')
 end = times[-1]
 
+custom_weights = None
+
 from time import localtime
 current_time = localtime() #pd.datetime.now()
 
