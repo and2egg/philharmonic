@@ -375,6 +375,7 @@ class State(object):
         if weights is None:
             weights = Machine.weights
         total_utilisation = 0.
+
         for r in s.resource_types:
             used = s.cap[r] - self.free_cap[s][r]
             utilisation = used / float(s.cap[r])
@@ -407,7 +408,7 @@ class State(object):
         
         """
         locations = list(set([s.loc for s in self.servers]))
-        return {location: self.utilisation_per_location(loc, weights) for loc in locations}
+        return {loc: self.utilisation_per_location(loc, weights) for loc in locations}
 
     def calculate_prices(self):
         """Return dict vm -> price."""

@@ -504,13 +504,13 @@ def get_data_loc_world(filename):
 
 def mixed_2_loc(filepath=None):
     if filepath is None:
-        filepath = get_data_loc_mixed('prices_da_2_loc.csv')
+        filepath = get_data_loc_mixed('prices_da_2loc.csv')
     el_prices = parse_dataset(filepath, conf.date_parser)
     return el_prices
 
 def mixed_2_loc_fc(filepath=None):
     if filepath is None:
-        filepath = get_data_loc_mixed('prices_da_2_loc_fc.csv')
+        filepath = get_data_loc_mixed('prices_da_2loc_fc.csv')
     forecast_el = parse_dataset(filepath)
     return forecast_el
 
@@ -661,21 +661,26 @@ def generate_fixed_input():
 
     """
     _override_settings()
+    # dynamic locations simply means retrieve locations from the 
+    # dataset pointed to by the method in conf.factory['el_prices']
     if conf.dynamic_locations:
+        # get function reference
         get_locations = globals()[conf.factory['el_prices']]
         df = get_locations()
     else:
         df = parse_dataset(location_dataset)
     locations = df.columns.values
-    ## TEST: assign locations directly
-    ## works, but in the simulation locations are still
-    ## retrieved by columns of prices
-    # locations = ['Helsinki','Portland']
     start, end = conf.start, conf.end
-    info('Generating input datasets\n-------------------------\nParameters:\n' +
-         '- location_dataset: {}\n'.format(location_dataset) +
-         '- times: {} - {}\n'.format(start, end)
-    )
+    if conf.dynamic_locations:
+        info('Generating input datasets\n-------------------------\nParameters:\n' +
+             '- location_dataset: {}\n'.format(get_locations.__name__) +
+             '- times: {} - {}\n'.format(start, end)
+        )
+    else:
+        info('Generating input datasets\n-------------------------\nParameters:\n' +
+             '- location_dataset: {}\n'.format(location_dataset) +
+             '- times: {} - {}\n'.format(start, end)
+        )
     info('Locations:\n{}\n'.format(locations))
     generate_cloud = globals()[cloud_infrastructure]
     cloud = generate_cloud(locations)

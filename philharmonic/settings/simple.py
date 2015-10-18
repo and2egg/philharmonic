@@ -20,6 +20,10 @@ simpleconf = {
 	'scenario': 5
 }
 
+factory['scheduler'] = 'SimpleScheduler'
+factory['scheduler_conf'] = simpleconf
+factory['environment'] = 'SimpleSimulatedEnvironment'
+
 
 # Input gen settings
 
@@ -57,9 +61,15 @@ inputgen_settings['VM_request_generation_method'] = 'normal_vmreqs_interval' # ?
 inputgen_settings['round_to_hour'] = False
 inputgen_settings['show_beta_value'] = False
 
-# General Settings
 
-MIXED = True
+
+#### General Settings ####
+
+# Mixed input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
+DATA_LOC = DATA_LOC_MIXED
+
+el_price_dataset = os.path.join(DATA_LOC, 'prices_da.csv')
+el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc.csv')
 
 ignore_ram = True
 
@@ -79,6 +89,8 @@ save_power = True
 
 save_util = True
 
+location_based = True
+
 transform_to_jouls = False
 
 prices_in_mwh = True
@@ -90,19 +102,13 @@ alternate_cost_model = True
 show_cloud_interval = None
 
 # possible values: el_prices_from_conf, mixed_2_loc
-factory['el_prices'] = 'mixed_2_loc'
+factory['el_prices'] = 'el_prices_from_conf'
 # possible values: forecast_el_from_conf, mixed_2_loc_fc
-factory['forecast_el'] = 'mixed_2_loc_fc'
+factory['forecast_el'] = 'forecast_el_from_conf'
 factory['temperature'] = None
-
-factory['scheduler'] = 'SimpleScheduler'
-factory['scheduler_conf'] = simpleconf
-factory['environment'] = 'SimpleSimulatedEnvironment'
-
 factory['forecast_periods'] = 5
 factory['SD_el'] = 0.2
 factory['real_forecasts'] = True
-# factory['local_forecasts'] = True
 factory['clean_requests'] = False
 
 
@@ -130,3 +136,4 @@ times = pd.date_range(start, periods=24 * 1, freq='H')
 end = times[-1]
 
 custom_weights = {'RAM': 0, '#CPUs': 1}
+# custom_weights = None

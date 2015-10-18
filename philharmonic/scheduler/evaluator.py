@@ -53,7 +53,11 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
     #TODO: use more precise pandas methods for indexing (performance)
     #TODO: maybe move some of this state iteration functionality into Cloud
     #TODO: see where schedule window should be propagated - here or Scheduler?
-    initial_utilisations = cloud.get_current().calculate_utilisations(weights)
+    if locationBased:
+        initial_utilisations = cloud.get_current().calculate_utilisations_per_location(weights)
+    else:
+        initial_utilisations = cloud.get_current().calculate_utilisations(weights)
+
     utilisations_list = [initial_utilisations]
     times = [start]
     for t in schedule.actions.index.unique():
@@ -73,6 +77,7 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
             new_utilisations = state.calculate_utilisations_per_location(weights)
         else:
             new_utilisations = state.calculate_utilisations(weights)
+        
         utilisations_list.append(new_utilisations)
         times.append(t)
     if times[-1] < end:
@@ -133,7 +138,7 @@ def calculate_cloud_cost(power, el_prices, locationBased=False):
     end= power.index[-1]
     el_prices_loc = pd.DataFrame()
     if locationBased:
-        for loc in power.columns.values: 
+        for loc in el_prices.columns.values: 
             el_prices_loc[loc] = el_prices[loc][start:end]
     else:
         for server in power.columns: # this might be very inefficient

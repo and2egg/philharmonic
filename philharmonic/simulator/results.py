@@ -28,9 +28,10 @@ def generate_series_results(cloud, env, schedule, nplots):
     #------------------
     # evaluator.precreate_synth_power(env.start, env.end, cloud.servers)
     if conf.custom_weights is not None:
-        util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, weights=conf.custom_weights)
+        util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, 
+                                weights=conf.custom_weights, locationBased=conf.location_based)
     else:
-        util = evaluator.calculate_cloud_utilisation(cloud, env, schedule)
+        util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, locationBased=conf.location_based)
     info('Utilisation (%)')
     info(str(util * 100))
 
@@ -125,10 +126,18 @@ def serialise_results(cloud, env, schedule):
     # dynamic results
     #----------------
     generate_series_results(cloud, env, schedule, nplots)
-
-    energy = evaluator.combined_energy(cloud, env, schedule)
-    energy_total = evaluator.combined_energy(cloud, env, schedule,
-                                             env.temperature)
+    if conf.custom_weights is not None:
+        energy = evaluator.combined_energy(cloud, env, schedule, 
+                                                    weights=conf.custom_weights, 
+                                                    locationBased=conf.location_based)
+        energy_total = evaluator.combined_energy(cloud, env, schedule,
+                                                 env.temperature,
+                                                 locationBased=conf.location_based)
+    else:
+        energy = evaluator.combined_energy(cloud, env, schedule)
+        energy_total = evaluator.combined_energy(cloud, env, schedule,
+                                                 env.temperature,
+                                                 locationBased=conf.location_based)
 
     # Aggregated results
     #===================
@@ -157,8 +166,15 @@ def serialise_results(cloud, env, schedule):
     # info(' - electricity cost without cooling:')
     # info(en_cost_IT)
     info(' - total electricity cost without cooling:')
-    en_cost_IT_total = evaluator.combined_cost(cloud, env, schedule,
-                                               env.el_prices)
+    if conf.custom_weights is not None:
+        en_cost_IT_total = evaluator.combined_cost(cloud, env, schedule, env.el_prices, 
+                                                    weights=conf.custom_weights, 
+                                                    locationBased=conf.location_based)
+    else:
+        en_cost_IT_total = evaluator.combined_cost(cloud, env, schedule,
+                                                   env.el_prices, 
+                                                   locationBased=conf.location_based)
+
     info(en_cost_IT_total)
 
     # TODO: reenable
@@ -170,6 +186,16 @@ def serialise_results(cloud, env, schedule):
     en_cost_with_cooling_total = evaluator.combined_cost(cloud, env, schedule,
                                                          env.el_prices,
                                                          env.temperature)
+    if conf.custom_weights is not None:
+        en_cost_with_cooling_total = evaluator.combined_cost(cloud, env, schedule, 
+                                        env.el_prices, env.temperature, 
+                                        weights=conf.custom_weights, 
+                                        locationBased=conf.location_based)
+    else:
+        en_cost_with_cooling_total = evaluator.combined_cost(cloud, env, schedule,
+                                        env.el_prices, env.temperature, 
+                                        locationBased=conf.location_based)
+        
     info(en_cost_with_cooling_total)
     info(' - total electricity cost with migrations:')
     en_cost_combined = en_cost_with_cooling_total + migration_cost
@@ -196,9 +222,16 @@ def serialise_results(cloud, env, schedule):
 
     # frequency savings
     info(' - frequency scaling savings (compared to no scaling):')
-    en_cost_combined_unscaled = evaluator.combined_cost(
-        cloud, env, schedule_unscaled, env.el_prices, env.temperature
-    ) + migration_cost
+    if conf.custom_weights is not None:
+        en_cost_combined_unscaled = evaluator.combined_cost(
+            cloud, env, schedule_unscaled, env.el_prices, env.temperature, 
+            weights=conf.custom_weights, locationBased=conf.location_based
+        ) + migration_cost
+    else:
+        en_cost_combined_unscaled = evaluator.combined_cost(
+            cloud, env, schedule_unscaled, env.el_prices, env.temperature,
+            locationBased=conf.location_based
+        ) + migration_cost
     scaling_savings_abs = en_cost_combined_unscaled - en_cost_combined
     info('${}'.format(scaling_savings_abs))
     scaling_savings_rel = scaling_savings_abs / en_cost_combined_unscaled
