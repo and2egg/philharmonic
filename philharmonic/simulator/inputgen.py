@@ -63,6 +63,30 @@ def distribution_population(num, bottom, top, ceil=True, distribution='normal'):
         else:
             return np.random.uniform(bottom, top, num)
 
+def distribution_population_fixed(num, ceil=True, distribution='uniform', values=[]):
+    """ Draw array from @param distribution.
+    for a fixed set of values from "values" array
+
+    """
+    if distribution == 'normal':
+        return [] # not implemented
+    elif distribution == 'uniform':
+        if len(values) == 0:
+            return []
+
+        if ceil: 
+            uniform_idx = np.random.randint(0, len(values), num)
+        else: 
+            uniform_idx = np.random.uniform(0, len(values), num)
+
+        values_result = np.empty_like (uniform_idx)
+        values_result[:] = uniform_idx
+
+        for i in range(len(uniform_idx)):
+            values_result[i] = values[uniform_idx[i]]
+        return values_result
+
+
 # DC description
 #---------------
 
@@ -121,15 +145,19 @@ def normal_infrastructure(locations=['A', 'B'],
 def uniform_infrastructure(locations = ['A', 'B']):
     """return a list of Servers distributed uniformly over all locations 
     with determined resource capacities
-    @author Andreas
+    @author Andreas Egger
 
     """
     servers = []
     servers_per_location = int(round(server_num / len(locations)))
     for location in locations:
         # array of server sizes
-        cpu_sizes = [max_server_cpu]*servers_per_location
-        ram_sizes = [max_server_ram]*servers_per_location
+        cpu_sizes = distribution_population(
+            servers_per_location, min_server_cpu, max_server_cpu,
+            distribution=resource_distribution)
+        ram_sizes = distribution_population(
+            servers_per_location, min_server_ram, max_server_ram,
+            distribution=resource_distribution)
     
         for cpu_size, ram_size in zip(cpu_sizes, ram_sizes):
             server = Server(ram_size, cpu_size, location=location)
@@ -328,6 +356,73 @@ def normal_vmreqs_interval(start, end, vm_req_interval='5min', **kwargs):
             moments.append(t)
     events = pd.TimeSeries(data=requests, index=moments)
     return events.sort_index()
+
+def uniform_vmreqs(start, end, round_to_hour=True, fixed_duration=True, total_duration=False, **kwargs):
+    """Generate the VM creation and deletion events in.
+    Uniformly distributed arrays - VM sizes and durations.
+    @param start, end - time interval (events within it)
+    @param fixed_duration if true then values will unfiformly distribute 
+    over a fixed set of durations, else the distribution will take into 
+    account min_duration and max_duration values
+    @author Andreas Egger
+
+    """
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    delta = end - start
+    # array of VM sizes
+    cpu_sizes = distribution_population(VM_num, min_cpu, max_cpu,
+                                        distribution=resource_distribution)
+    ram_sizes = distribution_population(VM_num, min_ram, max_ram,
+                                        distribution=resource_distribution)
+    
+    if fixed_duration: 
+        duration_values = [1,2,5,8,12,24,48] # fixed set of durations, 1000 denotes "infinite" duration
+        if total_duration:
+            total_hours = delta.total_seconds() / 3600
+            duration_values.append(total_hours)
+        duration_values = np.array(duration_values) * 3600 # get durations in seconds
+        # duration of VMs
+        durations = distribution_population_fixed(VM_num, distribution=resource_distribution, 
+                                        values=duration_values)
+    else:
+        durations = distribution_population(VM_num, min_duration, max_duration,
+                                        distribution=resource_distribution)
+    
+    requests = []
+    moments = []
+    for cpu_size, ram_size, duration in zip(cpu_sizes, ram_sizes, durations):
+        vm = VM(ram_size, cpu_size)
+        # the moment a VM is created
+        offset = pd.offsets.Second(np.random.uniform(0., delta.total_seconds()))
+        requests.append(VMRequest(vm, 'boot'))
+        if duration == delta.total_seconds(): # length over whole simulation duration
+            t = start
+        else:
+            t = start + offset
+            if round_to_hour:
+                t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour)
+            else:
+                minute = t.minute - (t.minute % 5)
+                t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour) + pd.offsets.Minute(minute)
+        moments.append(t)
+
+        # new offset from the new timestamp t
+        offset = t - start
+        # the moment a VM is destroyed
+        offset += pd.offsets.Second(duration)
+        # the moment a VM is destroyed
+        if start + offset <= end: # event is relevant
+            requests.append(VMRequest(vm, 'delete'))
+            t = start + offset
+            if round_to_hour:
+                t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour)
+            else:
+                minute = t.minute - (t.minute % 5)
+                t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour) + pd.offsets.Minute(minute)
+            moments.append(t)
+    events = pd.TimeSeries(data=requests, index=moments)
+    return events.sort_index()
+
 
 def uniform_vmreqs_beta_variation(start, end, round_to_hour=True, **kwargs):
     """Generate the VM creation and deletion events for
@@ -621,6 +716,9 @@ def parse_dataset(filepath, custom_date_parser=None):
 
 def times_from_conf():
     return conf.times
+
+def el_prices_from_web_service():
+    pass
 
 def el_prices_from_conf():
     el_prices = parse_dataset(conf.el_price_dataset, conf.date_parser)

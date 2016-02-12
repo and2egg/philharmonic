@@ -135,6 +135,7 @@ class BCDScheduler(IScheduler):
         find host at cheapest location based on average of forecasted values
 
         Otherwise find host at cheapest location based on current energy price
+        If current_loc is given, skip host finding for this location
 
         """
         t = self.environment.get_time()
@@ -144,8 +145,7 @@ class BCDScheduler(IScheduler):
         # iterate over "cheapest locations"
         # if there is not enough space at the cheapest location
         # go to the second cheapest location at this point in time
-        for loc_item in cheapest_loc:
-            # loc_item consists of tuples of (location, price)
+        for loc_item in cheapest_loc: # loc_item consists of tuples of (location, price)            
             location = loc_item[0]
             # skip the location the vm is currently located
             if location == current_loc and current_loc is not None:
@@ -189,7 +189,7 @@ class BCDScheduler(IScheduler):
                                         for vm in vms ], key=keyDuration, reverse=True)
         max_duration = sorted_vms[0][1]
         # calculate periods based on max_duration
-        fc_range_end = max_duration.seconds / 3600 + 1
+        fc_range_end = int(max_duration.total_seconds() / 3600) + 1
         # the forecasts for different horizons (job lengths) are precalculated such that 
         # they can be mapped to the current vm's duration
         fc_dict = { i: self.get_cheapest_locations(t_next, forecast, ideal, weighted, horizon=i)
@@ -201,11 +201,11 @@ class BCDScheduler(IScheduler):
             # Only migrate when duration exceeds migration time
             # break since vms are sorted by duration
             migration_time = ph.calculate_migration_time(vm, conf.fixed_bandwidth)
-            if duration.seconds < migration_time:
+            if duration.total_seconds() < migration_time:
                 break
             # Determine which calculated forecast value
             # is applied based on the current vm's duration
-            idx = duration.seconds / 3600 + 1
+            idx = int(duration.total_seconds() / 3600) + 1
             cheapest_loc = fc_dict[idx]
             loc = current.allocation(vm).loc
             price_current = prices[loc][t_next]

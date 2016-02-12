@@ -71,6 +71,8 @@ USA = False # USA or world-wide
 FIXED_EL_PRICES = False # fixed el. prices world-wide
 DATA_LOC_USA = os.path.join(DATA_LOC, "usa/")
 DATA_LOC_MIXED = os.path.join(DATA_LOC, "mixed/")
+DATA_LOC_SIM_DA = os.path.join(DATA_LOC, "simulation_DA/")
+DATA_LOC_SIM_RT = os.path.join(DATA_LOC, "simulation_RT/")
 DATA_LOC_WORLD = os.path.join(DATA_LOC, "world/")
 DATA_LOC_WORLD_FIXED_EL = os.path.join(DATA_LOC, "world-fixed_el/")
 if USA:

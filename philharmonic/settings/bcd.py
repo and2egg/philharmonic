@@ -28,19 +28,19 @@ factory['environment'] = 'SimpleSimulatedEnvironment'
 
 # Input gen settings
 
-inputgen_settings['resource_distribution'] = 'normal'
+inputgen_settings['resource_distribution'] = 'uniform' # uniform or normal
 
 inputgen_settings['server_num'] = 20
-inputgen_settings['min_server_cpu'] = 8 # 16,
+inputgen_settings['min_server_cpu'] = 4 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
-inputgen_settings['min_server_ram'] = 16 # 32,
+inputgen_settings['min_server_ram'] = 8 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
 inputgen_settings['VM_num'] = 200
-inputgen_settings['min_cpu'] = 4 # 2,
-inputgen_settings['max_cpu'] = 4 # 4,
-inputgen_settings['min_ram'] = 2 # 4,
-inputgen_settings['max_ram'] = 2 # 16,
+inputgen_settings['min_cpu'] = 1 # 2,
+inputgen_settings['max_cpu'] = 2 # 4,
+inputgen_settings['min_ram'] = 1 # 4,
+inputgen_settings['max_ram'] = 4 # 16,
 
 # inputgen_settings['min_duration'] = 60 * 5 # 5 minute
 # inputgen_settings['max_duration'] = 3600 * 2 # 2 hours
@@ -51,26 +51,27 @@ inputgen_settings['max_ram'] = 2 # 16,
 # inputgen_settings['min_duration'] = 60 * 60 # 1 hour
 # inputgen_settings['max_duration'] = 60 * 60 * 3 # 3 hours
 
-inputgen_settings['min_duration'] = 60 * 60 * 1 # 5 hours
+inputgen_settings['min_duration'] = 60 * 60 * 1 
 inputgen_settings['max_duration'] = 60 * 60 * 5 # 5 hours
 
 # inputgen_settings['min_duration'] = 60, # 1 minute
 # inputgen_settings['max_duration'] = 60 * 60 * 10, # ten hours
 
-inputgen_settings['cloud_infrastructure'] = 'uniform_infrastructure'
-inputgen_settings['VM_request_generation_method'] = 'normal_vmreqs_interval' # ? TODO check appropriate request gen method
-inputgen_settings['round_to_hour'] = False
+inputgen_settings['cloud_infrastructure'] = 'uniform_infrastructure' # uniform_infrastructure or normal_infrastructure
+inputgen_settings['VM_request_generation_method'] = 'uniform_vmreqs' # uniformly generate vm requests
+inputgen_settings['round_to_hour'] = True
 inputgen_settings['show_beta_value'] = False
 
 
 
 #### General Settings ####
 
-# Mixed input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
-DATA_LOC = DATA_LOC_MIXED
+# DATA_LOC_SIM_DA: DA input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
+# DATA_LOC_SIM_RT: RT input from USA (ISO-NE, PJM)
+DATA_LOC = DATA_LOC_SIM_DA
 
-el_price_dataset = os.path.join(DATA_LOC, 'prices_da.csv')
-el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc.csv')
+el_price_dataset = os.path.join(DATA_LOC, 'prices_da_all.csv')
+el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc_all.csv')
 
 add_date_to_folders = True
 
@@ -130,7 +131,7 @@ else:
     fileplot = True
 
 
-date_parser = lambda x: pd.datetime.strptime(x, '%d.%m.%Y %H:%M')
+# date_parser = lambda x: pd.datetime.strptime(x, '%d.%m.%Y %H:%M')
 
 
 # TODO Andreas: Make this setting dynamic!
@@ -138,7 +139,7 @@ date_parser = lambda x: pd.datetime.strptime(x, '%d.%m.%Y %H:%M')
 start = pd.Timestamp('2014-07-07 00:00')
 
 # TODO Andreas: Make this setting dynamic, or define as property in each settings file
-times = pd.date_range(start, periods=24 * 4, freq='H')
+times = pd.date_range(start, periods=24 * 10, freq='H')
 end = times[-1]
 
 custom_weights = {'RAM': 0, '#CPUs': 1}
