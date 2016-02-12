@@ -75,9 +75,11 @@ def calculate_migration_cost(vm, price_before, price_after):
     return cost
 
 
-def calculate_migration_time(vm, bandwidth=16):
+def calculate_migration_time(vm, bandwidth=100):
     """calculate migration time (s) based on 
-    the given vm and bandwidth (MBit/s)"""
+    the given vm and bandwidth (MBit/s)
+
+    """
     seconds = vm.res['RAM'] * 1000 / (bandwidth/8.)
     return seconds
 

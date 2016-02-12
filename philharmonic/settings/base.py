@@ -67,7 +67,7 @@ DATA_LOC = os.path.realpath(os.path.join(os.path.dirname(__file__),
 
 # the datasets used in the simulation
 USA = False # USA or world-wide
-MIXED = True 
+# MIXED = True
 FIXED_EL_PRICES = False # fixed el. prices world-wide
 DATA_LOC_USA = os.path.join(DATA_LOC, "usa/")
 DATA_LOC_MIXED = os.path.join(DATA_LOC, "mixed/")
@@ -80,9 +80,10 @@ else:
     if FIXED_EL_PRICES:
         DATA_LOC = DATA_LOC_WORLD_FIXED_EL
 
+# globally valid input datasets!
 temperature_dataset = os.path.join(DATA_LOC, 'temperatures.csv')
 el_price_dataset = os.path.join(DATA_LOC, 'prices.csv')
-
+el_price_forecast = os.path.join(DATA_LOC, 'prices.csv')
 
 dynamic_locations = False
 
@@ -90,16 +91,12 @@ date_parser = None
 
 # the time period of the simulation
 start = pd.Timestamp('2010-06-03 00:00')
-
-# - five hours
-#times = pd.date_range(start, periods=6, freq='H')
-# - one day
-#times = pd.date_range(start, periods=24, freq='H')
 # - one week
 times = pd.date_range(start, periods=24 * 7, freq='H')
 end = times[-1]
 
 custom_weights = None
+
 
 from time import localtime
 current_time = localtime() #pd.datetime.now()
@@ -151,9 +148,6 @@ factory = {
     ### no error
     "SD_el": 0,
     "SD_temp": 0,
-
-    "real_forecasts": False,
-    "real_forecast_map": False,
     ### small error
     #"SD_el": 0.01,
     #"SD_temp": 1.41,
@@ -163,6 +157,12 @@ factory = {
     ### large error
     #"SD_el": 0.05,
     #"SD_temp": 5,
+
+    # generate_forecasts: forecasts will be generated based on a given standard deviation
+    # local_forecasts: forecasts will be read from file, specified under property el_price_forecast
+    # real_forecasts: "real" forecasts will be retrieved from server (web service)
+    # real_forecast_map: "real" forecasts will be retrieved from server for each hour separately
+    "forecast_type": "generate_forecasts",
 
     # Timestamps of the simulation. Can be:
     #  times_from_conf (take times from conf.times, recommended),
@@ -186,14 +186,13 @@ factory = {
     # Can also be:
     #  simple_el, medium_el, usa_el, world_el, dynamic_usa_el
     #  simple_temperature, medium_temperature, usa_temperature,
-    #  world_temperature, dynamic_usa_temp
+    #  world_temperature, dynamic_usa_temp, mixed_2_loc
     "el_prices": "el_prices_from_conf",
-    # will be read when "local_forecasts" is True
+    # will be read when forecast_type == "local_forecasts"
     "forecast_el": "forecast_el_from_conf",
+    # reads temperature data as specified in conf
     "temperature": "temperature_from_conf",
 
-    # set to True if forecasts should be read from file
-    "local_forecasts": True,
 
     # Driver that takes the manager's actions and controls the cloud:
     #  nodriver (no actions)
@@ -210,7 +209,6 @@ def get_factory():
 # Percentage of utilisation under which a PM is considered underutilised
 underutilised_threshold = 0.5
 
-ignore_ram = False
 
 # inputgen settings
 #==================
@@ -221,13 +219,9 @@ inputgen_settings = {
     #    ( uniform or normal)
     'resource_distribution': 'uniform',
 
-    # cloud's servers
-    # if specified, takes precedence over 'location_dataset'
-    # can be one of usa_el, world_el etc. 
-    'location_df_method': None,
     # path to electricity price file
-    'location_dataset': el_price_dataset,
-    # 'location_dataset': usa_el
+    'location_dataset': el_price_dataset, # temperature_dataset
+    # cloud's servers
     #'server_num': 3,
     #'server_num': 1,
     #'server_num': 50,
@@ -327,6 +321,10 @@ f_base = 1000
 # pricing
 # the frequency at which to generate the VM price is calculated
 pricing_freq = '1h'
+
+# specifies the network bandwidth between each two data centers (in MBit/s)
+fixed_bandwidth = 100
+
 # checks whether a price transformation from kWh (MWh) to jouls will be done
 transform_to_jouls = True
 

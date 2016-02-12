@@ -2,7 +2,7 @@ from .base import *
 from philharmonic.logger import *
 from philharmonic import conf
 
-output_folder = os.path.join(base_output_folder, "simple/")
+output_folder = os.path.join(base_output_folder, "bcd/")
 
 
 
@@ -10,18 +10,19 @@ output_folder = os.path.join(base_output_folder, "simple/")
 
 # possible scenarios: 
 # 1) not cost aware (random assignments, migrations based on load?)
-# 2) cost aware request scheduling (take cheapest dc?)
-# 3) cost aware request scheduling + forecast (take cheapest dc?)
-# 4) cost aware requests and migrations (take cheapest dc?)
-# 5) cost aware requests and migrations + forecast (take cheapest dc?)
-# 6) cost aware requests and migrations + ideal forecast (take cheapest dc?)
+# 2) cost aware request scheduling (assign to currently cheapest DC)
+# 3) cost aware request scheduling + forecast (assign to cheapest DC based on forecasts and job length)
+# 4) cost aware request scheduling + ideal forecast (assign to cheapest DC based on ideal forecasts and job length)
+# 5) cost aware requests and migrations (assign to currently cheapest DC)
+# 6) cost aware requests and migrations + forecast (assign to cheapest DC based on forecasts and job length)
+# 7) cost aware requests and migrations + ideal forecast (assign to cheapest DC based on ideal forecasts and job length)
 
-simpleconf = {
-	'scenario': 4
+bcdconf = {
+	'scenario': 6
 }
 
-factory['scheduler'] = 'SimpleScheduler'
-factory['scheduler_conf'] = simpleconf
+factory['scheduler'] = 'BCDScheduler'
+factory['scheduler_conf'] = bcdconf
 factory['environment'] = 'SimpleSimulatedEnvironment'
 
 
@@ -29,13 +30,13 @@ factory['environment'] = 'SimpleSimulatedEnvironment'
 
 inputgen_settings['resource_distribution'] = 'normal'
 
-inputgen_settings['server_num'] = 6
+inputgen_settings['server_num'] = 20
 inputgen_settings['min_server_cpu'] = 8 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 16 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 20
+inputgen_settings['VM_num'] = 200
 inputgen_settings['min_cpu'] = 4 # 2,
 inputgen_settings['max_cpu'] = 4 # 4,
 inputgen_settings['min_ram'] = 2 # 4,
@@ -50,7 +51,7 @@ inputgen_settings['max_ram'] = 2 # 16,
 # inputgen_settings['min_duration'] = 60 * 60 # 1 hour
 # inputgen_settings['max_duration'] = 60 * 60 * 3 # 3 hours
 
-inputgen_settings['min_duration'] = 60 * 60 * 5 # 5 hours
+inputgen_settings['min_duration'] = 60 * 60 * 1 # 5 hours
 inputgen_settings['max_duration'] = 60 * 60 * 5 # 5 hours
 
 # inputgen_settings['min_duration'] = 60, # 1 minute
@@ -137,7 +138,7 @@ date_parser = lambda x: pd.datetime.strptime(x, '%d.%m.%Y %H:%M')
 start = pd.Timestamp('2014-07-07 00:00')
 
 # TODO Andreas: Make this setting dynamic, or define as property in each settings file
-times = pd.date_range(start, periods=24 * 1, freq='H')
+times = pd.date_range(start, periods=24 * 4, freq='H')
 end = times[-1]
 
 custom_weights = {'RAM': 0, '#CPUs': 1}

@@ -136,29 +136,30 @@ class Simulator(IManager):
         super(Simulator, self).__init__()
         self.environment.el_prices = self._create(inputgen,
                                                   self.factory['el_prices'])
-        if conf.prices_in_mwh:
-            self.environment.el_prices = self.environment.el_prices / 1000
         if self.factory['temperature'] is None:
             self.environment.temperature = None
         else:
             self.environment.temperature = self._create(inputgen,
                                                     self.factory['temperature'])
+
         self.environment.locations = list(self.environment.el_prices.columns.values)
         SD_el = self.factory['SD_el'] if 'SD_el' in self.factory  else 0
         SD_temp = self.factory['SD_temp'] if 'SD_temp' in self.factory  else 0
         forecast_periods = self.factory['forecast_periods'] if 'forecast_periods' in self.factory else 12
-        if 'local_forecasts' in self.factory and self.factory['local_forecasts'] == True:
-            if 'forecast_el' not in self.factory:
-                self.factory['forecast_el'] = 'forecast_el_from_conf'
+        
+        if self.factory['forecast_type'] == "generate_forecasts":
+            self.environment.model_forecast_errors(SD_el, SD_temp)
+        elif self.factory['forecast_type'] == "local_forecasts":
             self.environment.forecast_el = self._create(inputgen,
                                                   self.factory['forecast_el'])
-        elif 'real_forecasts' in self.factory and self.factory['real_forecasts'] == True:
+        elif self.factory['forecast_type'] == "real_forecasts":
             self.environment.get_real_forecasts()
-        elif 'real_forecast_map' in self.factory and self.factory['real_forecast_map'] == True:
+        elif self.factory['forecast_type'] == "real_forecast_map":
             self.environment.get_real_forecast_map(forecast_periods)
-        else:
-            self.environment.model_forecast_errors(SD_el, SD_temp)
+
+        # TODO Andreas: check "real_forecasts" and "real_forecast_map" as well
         if conf.prices_in_mwh:
+            self.environment.el_prices = self.environment.el_prices / 1000
             self.environment.forecast_el = self.environment.forecast_el / 1000
 
         print "start of forecast values: "

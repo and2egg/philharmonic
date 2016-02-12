@@ -7,10 +7,12 @@ import philharmonic as ph
 import pandas as pd
 import numpy as np
 
-class SimpleScheduler(IScheduler):
-    """Simple scheduler. Should find host based on capacities
-        and energy prices applying a greedy algorithm. """
+class BCDScheduler(IScheduler):
+    """Best cost decreasing scheduler. It determines the cheapest location based on 
+    current and future energy prices and decides whether a job should be migrated 
+    based on remaining execution length while taking into account possible SLA penalties.  
 
+    """
     def __init__(self, cloud=None, driver=None):
         IScheduler.__init__(self, cloud, driver)
 

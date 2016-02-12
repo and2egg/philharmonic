@@ -1,0 +1,37 @@
+
+
+
+desired machine weights: _weights = {'RAM': 0, '#CPUs': 1}
+
+
+Methods related to utilisation and weights (model):
+
+
+def utilisation(self, s, weights=None):
+
+def utilisation_per_location(self, loc, weights=None):
+
+calculate_utilisations(self, weights=None):
+
+def calculate_utilisations_per_location(self, weights=None):
+
+def underutilised(self, s, threshold = 0.25): (State)
+
+
+
+--> affected functions: 
+
+ - evaluator.evaluate(cloud, environment, schedule,
+             el_prices, temperature=None,
+             start=None, end=None, weights=None):
+			 
+ - evaluator.calculate_cloud_utilisation(cloud, environment, schedule,
+                                start=None, end=None, weights=None, locationBased=False):
+								
+	- combined_cost(cloud, environment, schedule, el_prices, temperature=None,
+                  start=None, end=None, weights=None, locationBased=False):
+				  
+	- combined_energy(cloud, environment, schedule, temperature=None,
+                    start=None, end=None, weights=None, locationBased=False):
+					
+	

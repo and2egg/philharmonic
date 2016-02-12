@@ -130,9 +130,10 @@ def serialise_results(cloud, env, schedule):
         energy = evaluator.combined_energy(cloud, env, schedule, 
                                                     weights=conf.custom_weights, 
                                                     locationBased=conf.location_based)
-        energy_total = evaluator.combined_energy(cloud, env, schedule,
-                                                 env.temperature,
-                                                 locationBased=conf.location_based)
+        energy_total = energy
+        # energy_total = evaluator.combined_energy(cloud, env, schedule,
+        #                                          env.temperature,
+        #                                          locationBased=conf.location_based)
     else:
         energy = evaluator.combined_energy(cloud, env, schedule)
         energy_total = evaluator.combined_energy(cloud, env, schedule,

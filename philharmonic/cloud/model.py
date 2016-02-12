@@ -38,11 +38,6 @@ class ModelUsageError(Exception):
 class Machine(object):
     resource_types = ['RAM', '#CPUs'] # can be overridden
     _weights = None
-    # _weights = {'RAM': 0, '#CPUs': 1}
-
-    # TODO_Andreas: ignore ram
-    # if conf.ignore_ram:
-    #     _weights = {'RAM': 0, '#CPUs': 1}
 
     def __init__(self, *args):
         self.id = type(self)._new_id()

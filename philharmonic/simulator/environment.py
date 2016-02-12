@@ -78,12 +78,16 @@ class SimulatedEnvironment(Environment):
         optional forecasting error (for forecast=True).
 
         """
-        if forecast and hasattr(self, 'forecast_el'):
-            el_prices = self.forecast_el[self.t:self.forecast_end]
-            el_prices[self.t] = self.el_prices[self.t]
-        elif forecast and hasattr(self, 'forecast_data_map'):
-            el_prices = self.forecast_data_map[self.t]['values']
-        else:
+        if forecast:
+            if hasattr(self, 'forecast_el'):
+                el_prices = self.forecast_el[self.t:self.forecast_end]
+            elif hasattr(self, 'real_forecasts'):
+                el_prices = self.real_forecasts[self.t:self.forecast_end]
+            elif hasattr(self, 'forecast_data_map'):
+                el_prices = self.forecast_data_map[self.t]['values']
+            else:
+                el_prices = self.el_prices[self.t:self.forecast_end]
+        else: 
             el_prices = self.el_prices[self.t:self.forecast_end]
 
         if self.temperature is not None:
@@ -114,11 +118,7 @@ class SimulatedEnvironment(Environment):
 
     def get_real_forecasts(self):
         print("get real forecasts for simulation period (REST interface)")
-        self.forecast_el = self._retrieve_forecasts()
-
-    def get_forecast_data(self, t):
-        el_prices = self.forecast_data_map[t]
-        return el_prices
+        self.real_forecasts = self._retrieve_forecasts()
 
     def _get_forecast_values(self, price, horizon): 
         return self._get_forecast_dummy_values(price, 0.1, horizon)

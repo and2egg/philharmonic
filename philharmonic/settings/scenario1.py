@@ -2,8 +2,6 @@ from .base import *
 from philharmonic.logger import *
 from philharmonic import conf
 
-output_folder = os.path.join(base_output_folder, "simple/")
-
 
 
 # scheduler configuration
@@ -16,13 +14,12 @@ output_folder = os.path.join(base_output_folder, "simple/")
 # 5) cost aware requests and migrations + forecast (take cheapest dc?)
 # 6) cost aware requests and migrations + ideal forecast (take cheapest dc?)
 
-simpleconf = {
-	'scenario': 4
-}
 
-factory['scheduler'] = 'SimpleScheduler'
-factory['scheduler_conf'] = simpleconf
-factory['environment'] = 'SimpleSimulatedEnvironment'
+
+# Various scheduling settings
+#============================
+# Percentage of utilisation under which a PM is considered underutilised
+underutilised_threshold = 0.0
 
 
 # Input gen settings
@@ -77,24 +74,23 @@ dynamic_locations = True
 
 prompt_configuration = True
 
-
+show_pm_frequencies = False
 
 power_freq_model = False
 
 power_randomize = False
 
-show_pm_frequencies = False
-
 save_power = True
+
 save_util = True
+
+location_based = True
 
 transform_to_jouls = False
 
 prices_in_mwh = True
 
 alternate_cost_model = True
-
-location_based = True
 
 # show_cloud_interval = pd.offsets.Hour(12) # interval at which simulation output should be done
 
@@ -131,13 +127,14 @@ else:
 
 date_parser = lambda x: pd.datetime.strptime(x, '%d.%m.%Y %H:%M')
 
-
 # TODO Andreas: Make this setting dynamic!
 # the time period of the simulation
 start = pd.Timestamp('2014-07-07 00:00')
 
 # TODO Andreas: Make this setting dynamic, or define as property in each settings file
-times = pd.date_range(start, periods=24 * 1, freq='H')
+total_periods = 24 * 1
+period_freq = 'H'
+times = pd.date_range(start, periods=total_periods, freq=period_freq)
 end = times[-1]
 
 custom_weights = {'RAM': 0, '#CPUs': 1}
