@@ -13,6 +13,15 @@ class BCDScheduler(IScheduler):
     based on remaining execution length while taking into account possible SLA penalties.  
 
     """
+
+
+    ### Defining CONSTANTS ####
+
+    max_fc_horizon = 12
+
+
+
+
     def __init__(self, cloud=None, driver=None):
         IScheduler.__init__(self, cloud, driver)
 
@@ -103,6 +112,7 @@ class BCDScheduler(IScheduler):
         locations = prices.axes[1]
         if forecast:
             fc_list = []
+            import ipdb; ipdb.set_trace()
             for loc in locations:
                 avg = self._calculate_avg_price(prices[loc][t], fc_prices[loc], t+period, t+period*(horizon), weighted=weighted)
                 fc_list.append((loc, avg))
@@ -111,6 +121,142 @@ class BCDScheduler(IScheduler):
         else:
             min_prices = sorted([(loc, prices[loc][t]) for loc in locations], key=getPricesKey)
             return min_prices
+
+
+
+
+
+
+    ######  Utility preparation functions  ######
+
+    def _calculate_price_differences(self, t_next, fc_prices, min_h, max_h):
+
+        def _create_dict(self, locations, min_h, max_h):
+            d = {}
+            for h in range(min_h,max_h+1):
+                d[h] = {}
+                for l in locations: 
+                    d[h][l] = []
+            return d
+
+        period = self.environment.get_period()
+        locations = fc_prices.axes[1]
+        
+        min_ME = None
+        max_ME = None
+        d = self._create_dict(locations, min_h, max_h)
+        fc_start = t_next - period # current time stamp
+
+        for h in range(min_h,max_h+1):
+            curr_h = t_next+period*h
+            visited = {}
+            for l in locations:
+                visited[l] = False
+
+            for l in d[h]:
+                for other in d[h]:
+                    if other != l and not visited[other]:
+                        vec1 = fc_prices[l][fc_start : curr_h]
+                        vec2 = fc_prices[other][fc_start : curr_h]
+
+                        mean_error = sum([v[0] - v[1] for v in zip(vec1,vec2)]) # mean error
+
+                        d[h][l].append((l,mean_error))          # append tuple of location and mean error
+                        d[h][other].append((l,-mean_error))     # append tuple of location and mean error
+
+                        # d[h][l][other] = mean_error         # append tuple of location and mean error
+                        # d[h][other][l] = -mean_error     # append tuple of location and mean error
+
+                visited[l] = True
+
+        # for each fc horizon h and location l save a tuple of (location, maximum mean error)
+        for h in range(min_h,max_h+1):
+            for l in locations: 
+                min_T = min(d[h][l], key=lambda x: x[1])  # tuple of location and minimum ME value
+                max_T = max(d[h][l], key=lambda x: x[1])  # tuple of location and maximum ME value
+                if min_ME is None or min_T[1] < min_ME:
+                    min_ME = min_T[1]
+                if max_ME is None or max_T[1] < max_ME:
+                    max_ME = max_T[1]
+                d[h][l] = max_T
+
+        for h in range(min_h,max_h+1):
+            for l in locations: 
+                item = d[h][l]
+                d[h][l] = (item[0], self._normaliseMeanError(item[1], min_ME, max_ME))
+
+        return d
+
+
+    def _normaliseMeanError(self, me, min_me, max_me):
+        return (float(me) - min_me) / (max_me - min_me)
+
+
+    def get_estimated_cost_savings(self, t_next, forecast=False, ideal=False, weighted=False, horizon=8):
+        """Get the estimated maximum cost savings when migrating a VM considering differences in 
+        energy prices and remaining VM run time
+
+        """
+        def getPricesKey(item):
+            """ Get second entry in item """
+            return item[1]
+
+
+        prices = self.environment.el_prices
+        current = self.cloud.get_current()
+        vms = self.cloud.get_vms()
+        if len(vms) == 0:
+            return []
+        # clear vms of all vms located at the currently cheapest location
+        vms = vms.difference(current.unallocated_vms())
+        if len(vms) == 0:
+            return []
+
+        prices = self.environment.el_prices
+        fc_prices = self.environment.forecast_el
+        if ideal:
+            fc_prices = prices
+        period = self.environment.get_period()
+        locations = prices.axes[1]
+
+        min_h = 0
+        max_h = max_fc_horizon
+
+        fc_dict = self._calculate_price_differences(t_next, fc_prices, min_h, max_h)
+        vm_mig = {}
+
+        for vm in vms:
+            vm_remaining = self.environment.get_remaining_duration(vm, t_next)
+            max_fc = min(vm_remaining-1, max_fc_horizon)
+
+            current_loc = current.allocation(vm).loc
+            me_tuple = fc_dict[max_fc][current_loc]
+            vm_mig[vm] = me_tuple
+
+        vm_mig = sorted(vm_mig.items(), key=lambda x:x[1][1], reverse=True)  # sorting by the 2nd value of the item's tuple -> mean error
+
+    #     prices = self.environment.el_prices
+    #     fc_prices = self.environment.forecast_el
+    #     if ideal:
+    #         fc_prices = prices
+    #     period = self.environment.get_period()
+    #     locations = prices.axes[1]
+    #     if forecast:
+    #         fc_list = []
+    #         for loc in locations:
+    #             avg = self._calculate_avg_price(prices[loc][t], fc_prices[loc], t+period, t+period*(horizon), weighted=weighted)
+    #             fc_list.append((loc, avg))
+    #         fc_list.sort(key=getPricesKey)
+    #         return fc_list
+    #     else:
+    #         min_prices = sorted([(loc, prices[loc][t]) for loc in locations], key=getPricesKey)
+    #         return min_prices
+
+
+
+
+
+
 
 
     def _find_random_host(self, vm, current_loc=None):
@@ -159,6 +305,73 @@ class BCDScheduler(IScheduler):
                     # print "Server {} chosen at location {}".format(server, server.loc)
                     return server
         return None
+
+
+
+
+
+
+    def evaluate_utility_function(self, t_next, forecast=False, ideal=False, weighted=False):
+        """Get all vms that are currently located at more expensive
+        locations with a remaining duration that exceeds the migration
+        time. In addition, only migrate vms for which the following 
+        equation holds:  mig_cost + price_remote < price_current 
+
+        """
+        prices = self.environment.el_prices
+        cheapest_loc = self.get_cheapest_locations(t_next, forecast, ideal, weighted)
+        current = self.cloud.get_current()
+        vms = self.cloud.get_vms()
+        if len(vms) == 0:
+            return []
+        # clear vms of all vms located at the currently cheapest location
+        vms = vms.difference(current.unallocated_vms())
+        if len(vms) == 0:
+            return []        
+
+        # vms_cleared = [vm for vm in vms if current.allocation(vm).loc != cheapest_loc[0][0]]
+
+        # sort vms by duration, with longest ones at the beginning
+        def keyDuration(item):
+            return item[1]        
+        # create sorted list of tupels of (vm, remaining_duration)
+        sorted_vms = sorted([(vm, self.environment.get_remaining_duration(vm, t_next)) 
+                                        for vm in vms ], key=keyDuration, reverse=True)
+        max_duration = sorted_vms[0][1]
+        # calculate periods based on max_duration
+        fc_range_end = int(max_duration.total_seconds() / 3600) + 1
+        # the forecasts for different horizons (job lengths) are precalculated such that 
+        # they can be mapped to the current vm's duration
+        fc_dict = { i: self.get_cheapest_locations(t_next, forecast, ideal, weighted, horizon=i)
+                                        for i in range(1,fc_range_end+1)}
+        vms_to_migrate = []
+        for vm_item in sorted_vms:
+            vm = vm_item[0]
+            duration = vm_item[1]
+            # Only migrate when duration exceeds migration time
+            # break since vms are sorted by duration
+            migration_time = ph.calculate_migration_time(vm, conf.fixed_bandwidth)
+            if duration.total_seconds() < migration_time:
+                break
+            # Determine which calculated forecast value
+            # is applied based on the current vm's duration
+            idx = int(duration.total_seconds() / 3600) + 1
+            cheapest_loc = fc_dict[idx]
+            loc = current.allocation(vm).loc
+            price_current = prices[loc][t_next]
+            # get price from cheapest remote location and next timestamp
+            price_remote = prices[cheapest_loc[0][0]][t_next]
+            mig_cost = ph.calculate_migration_cost(vm, price_current, price_remote)
+            # TODO Andreas: calculate migration penalty (cent per minute)
+            # Formula to fulfill before migration
+            # migrate = Migration Costs + Remote Costs < Current Costs
+            if mig_cost + price_remote < price_current:
+                vms_to_migrate.append(vm)
+        return vms_to_migrate
+
+
+
+
 
 
     def _get_migration_vms(self, t_next, forecast=False, ideal=False, weighted=False):

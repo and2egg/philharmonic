@@ -139,7 +139,7 @@ else:
 start = pd.Timestamp('2014-07-07 00:00')
 
 # TODO Andreas: Make this setting dynamic, or define as property in each settings file
-times = pd.date_range(start, periods=24 * 10, freq='H')
+times = pd.date_range(start, periods=24 * 28, freq='H')
 end = times[-1]
 
 custom_weights = {'RAM': 0, '#CPUs': 1}
