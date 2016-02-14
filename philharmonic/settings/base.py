@@ -99,6 +99,8 @@ end = times[-1]
 
 custom_weights = None
 
+update_vm_sla = False
+
 
 from time import localtime
 current_time = localtime() #pd.datetime.now()

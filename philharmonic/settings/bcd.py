@@ -82,21 +82,15 @@ prompt_configuration = True
 
 
 power_freq_model = False
-
 power_randomize = False
-
 show_pm_frequencies = False
-
 save_power = True
 save_util = True
-
 transform_to_jouls = False
-
 prices_in_mwh = True
-
 alternate_cost_model = True
-
 location_based = True
+update_vm_sla = True
 
 # show_cloud_interval = pd.offsets.Hour(12) # interval at which simulation output should be done
 
@@ -142,5 +136,5 @@ start = pd.Timestamp('2014-07-07 00:00')
 times = pd.date_range(start, periods=24 * 28, freq='H')
 end = times[-1]
 
-custom_weights = {'RAM': 0, '#CPUs': 1}
+# custom_weights = {'RAM': 0, '#CPUs': 1}
 # custom_weights = None

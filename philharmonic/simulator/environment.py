@@ -188,6 +188,14 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
                 self._requests = requests
             else:
                 self._requests = inputgen.normal_vmreqs(self.start, self.end)
+            [vm_start, vm_end, vm_duration] = self._get_vm_durations()
+            self.vm_start = vm_start
+            self.vm_end = vm_end
+            self.vm_duration = vm_duration
+            [vm_sla, vm_sla_th] = self._get_vm_sla()
+            self.vm_sla = vm_sla
+            self.vm_sla_th = vm_sla_th
+
         else:
             self._t = 0
             self._period = 1
@@ -242,6 +250,72 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
         else:
             return requ_vms[start:end]
 
+    def _get_vm_durations(self):
+        requests = self._requests
+        vms = [req.vm for req in requests.values]
+
+        vm_start = {}
+        vm_end = {}
+        vm_duration = {}
+
+        for vm in vms:
+            [start, end, duration] = self._get_vm_duration(vm)
+            vm_start[vm] = start
+            vm_end[vm] = end
+            vm_duration[vm] = duration
+
+        return [vm_start, vm_end, vm_duration]
+
+    def _get_vm_duration(self, vm):
+        start = self.start
+        end = self.end
+        requests = self._requests
+
+        # iterate through all requests to find 
+        # the start and end times of this vm
+        for t, req in requests.iteritems():
+            if req.what == 'boot' and req.vm == vm:
+                start = t
+            if req.what == 'delete' and req.vm == vm:
+                end = t
+
+        # e.g. duration of 3 hours:
+        # datetime.timedelta(0, 10800)
+        duration = end - start
+        return [start, end, duration]
+
+    def get_remaining_duration(self, vm, t=None):
+        if t is None:
+            start = self.get_time()
+        else:
+            start = t
+
+        end = self.vm_end[vm]
+        # # e.g. duration of 3 hours:
+        # # datetime.timedelta(0, 10800)
+        return end - start
+
+    def _get_vm_sla(self):
+        requests = self._requests
+        vms = [req.vm for req in requests.values]
+
+        # statically assign sla for now
+        sla = 99.95
+
+        vm_sla = {}
+        vm_sla_th = {}
+        for vm in vms:
+            vm.sla = sla
+            vm_sla[vm] = sla
+            vm_sla_th[vm] = _get_sla_th(vm, sla)
+
+        return [vm_sla, vm_sla_th]
+
+    def _get_sla_th(self, vm, sla):
+        return self.vm_duration[vm]*(1-sla / 100.0)
+
+
+
 class GASimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
     pass
 
@@ -253,26 +327,6 @@ class SimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
         request = set([req.vm for req in requests.values if req.what == 'delete' and req.vm == vm])
         return request
 
-    def get_remaining_duration(self, vm, t=None):
-        if t is None:
-            start = self.get_time()
-        else:
-            start = t
-        end = self.end
-
-        requests = self._requests[start:end]
-
-        # iterate through remaining requests
-        # to get the time of the corresponding 
-        # 'delete' action
-        for t, req in requests.iteritems():
-            if req.what == 'delete' and req.vm == vm:
-                end = t
-                break
-
-        # e.g. duration of 3 hours:
-        # datetime.timedelta(0, 10800)
-        duration = end - start
-        return duration
+    
 
 

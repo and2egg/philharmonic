@@ -178,6 +178,15 @@ class Simulator(IManager):
             self.real_schedule.add(action, t)
             self.driver.apply_action(action, t)
 
+    def update_vm_states(self):
+        """update state of vms concerning accumulated downtime and sla penalties"""
+        vms = self.cloud.get_current().vms
+        for vm in vms:
+            sla_th = self.environment.vm_sla_th[vm]
+            if vm.downtime > sla_th:
+                vm.downtime = vm.downtime - sla_th
+                vm.penalties += 1
+
     def prompt(self):
         if conf.prompt_show_cloud:
             if conf.prompt_ipdb:
@@ -227,6 +236,7 @@ class Simulator(IManager):
             # call scheduler to decide on actions
             schedule = self.scheduler.reevaluate()
             self.cloud.reset_to_real()
+
             period = self.environment.get_period()
             actions = schedule.filter_current_actions(t, period)
             if len(requests) > 0:
@@ -237,6 +247,8 @@ class Simulator(IManager):
             if len(planned_actions) > 0:
                 debug('Planned:\n{}\n'.format(planned_actions))
             self.apply_actions(actions)
+            if conf.update_vm_sla == True:
+                self.update_vm_states()
             # import ipdb; ipdb.set_trace()
             if conf.show_cloud_interval is not None and t == t_show:
                 t_show = t_show + conf.show_cloud_interval
