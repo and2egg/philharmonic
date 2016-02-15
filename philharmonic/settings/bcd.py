@@ -136,5 +136,5 @@ start = pd.Timestamp('2014-07-07 00:00')
 times = pd.date_range(start, periods=24 * 28, freq='H')
 end = times[-1]
 
-# custom_weights = {'RAM': 0, '#CPUs': 1}
+custom_weights = {'RAM': 0.5, '#CPUs': 0.5}
 # custom_weights = None

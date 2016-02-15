@@ -307,12 +307,13 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
         for vm in vms:
             vm.sla = sla
             vm_sla[vm] = sla
-            vm_sla_th[vm] = _get_sla_th(vm, sla)
+            vm_sla_th[vm] = self._get_sla_th(vm, sla)
 
         return [vm_sla, vm_sla_th]
 
     def _get_sla_th(self, vm, sla):
-        return self.vm_duration[vm]*(1-sla / 100.0)
+        duration = self.vm_duration[vm].total_seconds() / 3600
+        return duration*(1-sla / 100.0)
 
 
 

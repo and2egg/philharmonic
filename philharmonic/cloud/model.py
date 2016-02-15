@@ -12,6 +12,7 @@ Created on Jul 11, 2013
 
 import copy
 import itertools
+import math
 
 from philharmonic.utils import deprecated, CommonEqualityMixin
 from philharmonic.cloud import visualiser
@@ -103,6 +104,7 @@ class VM(Machine):
         super(VM, self).__init__(*args)
         self.res = self.spec
         self.price = 0.026 # $/h - default price Amazon US East t2.small
+        self.server = None
         # beta or CPU-boundedness: 1. CPU-bounded, towards 0. not CPU-bounded
         self.beta = 1.
         self.downtime = 0
@@ -118,20 +120,20 @@ class VM(Machine):
         return s
 
 
-    def get_downtime(self):
-        return self.downtime
+    # def get_downtime(self):
+    #     return self.downtime
 
-    def set_downtime(self, dt):
-        self.downtime = dt
+    # def set_downtime(self, dt):
+    #     self.downtime = dt
 
-    def get_penalties(self):
-        return self.penalties
+    # def get_penalties(self):
+    #     return self.penalties
 
-    def set_penalties(self, p):
-        self.penalties = p
+    # def set_penalties(self, p):
+    #     self.penalties = p
 
-    downtime = property(get_downtime, set_downtime, doc="accumulated downtime experienced by this VM")
-    penalties = property(get_penalties, set_penalties, doc="number of penalties experienced by this VM")
+    # downtime = property(get_downtime, set_downtime, doc="accumulated downtime experienced by this VM")
+    # penalties = property(get_penalties, set_penalties, doc="number of penalties experienced by this VM")
 
 
     # calling (un)pause or migrate on a VM gets routed to the cloud
@@ -233,11 +235,11 @@ class State(object):
     _KWH_RATIO = 3.6e6
     alpha = 0.512
     beta = 20.165
-    joul2kwh = lambda jouls : jouls / _KWH_RATIO
-    E_mig = lambda V_mig : alpha*V_mig + beta
-    V_mig = lambda V_mem, R, D, n : V_mem * (1-(D/float(R/8.))**(n+1))/(1-D/float(R/8.))
-    T_mig = lambda V_mig, R : V_mig/(R/8.) # R assumed to be in Mb/s
-    T_n = lambda V_mem, R, D, n : V_mem * (D/float(R/8.))**(n) / (R/8.)
+    joul2kwh = lambda self, jouls : jouls / _KWH_RATIO
+    E_mig = lambda self, V_mig : alpha*V_mig + beta
+    V_mig = lambda self, V_mem, R, D, n : V_mem * (1-(D/float(R/8.))**(n+1))/(1-D/float(R/8.))
+    T_mig = lambda self, V_mig, R : V_mig/(R/8.) # R assumed to be in Mb/s
+    T_n = lambda self, V_mem, R, D, n : V_mem * ((D/float(R/8.))**(n)) / (R/8.)
     T_resume = 50 # in ms
     n_max = 10 # max iterations before pre-copying phase finishes
     # constants
@@ -258,6 +260,8 @@ class State(object):
         self._alloc = {}
         for s, vms in other_alloc.iteritems():
             self.alloc[s] = set(vms) # create a new set
+            for vm in vms:
+                vm.server = s
 
     def auto_allocate(self):
         """Place all VMs on the first server."""
@@ -270,6 +274,7 @@ class State(object):
         """Change current state to have vm on server s."""
         if vm not in self._alloc[s]:
             self._alloc[s].add(vm)
+            vm.server = s
             for r in s.resource_types: # update free capacity
                 self.free_cap[s][r] -= vm.res[r]
         return self
@@ -278,12 +283,15 @@ class State(object):
         """Change current state to not have vm on server s."""
         if vm in self._alloc[s]:
             self._alloc[s].remove(vm)
+            vm.server = None
             for r in s.resource_types: # update free capacity
                 self.free_cap[s][r] += vm.res[r]
         return self
 
     def remove_all(self, s):
         """Change current state to have no VMs on server s."""
+        for vm in self._alloc[s]:
+            self.remove(vm, s)
         self._alloc[s] = set()
         self.free_cap[s] = copy.copy(s.cap)
         return self
@@ -467,25 +475,29 @@ class State(object):
         except ZeroDivisionError:
             n = 1 # TODO: check what raises this error
         # Typically add 1/3 of memory to get migration data
-        T_n = self.T_n(memory, self.R/8., self.D, self.n)
-        T_down = T_n + self.T_resume
+        stop_time = self.T_n(memory, self.R, self.D, n)
+        T_down = stop_time + self.T_resume
         return T_down
 
     # constraint checking
     # C1
     def is_allocated(self, vm):
         """True if @param vm is allocated to any server in this state."""
-        for s in self.servers:
-            if vm in self._alloc[s]:
-                return True
-        return False
+        return vm.server is not None
+        ## @author Andreas: Too inefficient! Take direct reference from vm
+        # for s in self.servers:
+        #     if vm in self._alloc[s]:
+        #         return True
+        # return False
 
     def allocation(self, vm):
         """The server to which @param vm is allocated or None."""
-        for s in self.servers:
-            if vm in self._alloc[s]:
-                return s
-        return None
+        return vm.server
+        ## @author Andreas: Too inefficient! Take direct reference from vm
+        # for s in self.servers:
+        #     if vm in self._alloc[s]:
+        #         return s
+        # return None
 
     def unallocated_vms(self):
         """Return the set of unallocated VMs."""
