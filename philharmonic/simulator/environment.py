@@ -192,9 +192,7 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
             self.vm_start = vm_start
             self.vm_end = vm_end
             self.vm_duration = vm_duration
-            [vm_sla, vm_sla_th] = self._get_vm_sla()
-            self.vm_sla = vm_sla
-            self.vm_sla_th = vm_sla_th
+            self.vm_sla_ths = self._get_vm_sla_ths()
 
         else:
             self._t = 0
@@ -295,26 +293,57 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
         # # datetime.timedelta(0, 10800)
         return end - start
 
-    def _get_vm_sla(self):
+    def _get_vm_sla_ths(self):
+        """Save a list of threshold values (in seconds) 
+        for penalties applicable for each vm
+        """
         requests = self._requests
         vms = [req.vm for req in requests.values]
 
-        # statically assign sla for now
-        sla = 99.95
-
-        vm_sla = {}
-        vm_sla_th = {}
+        vm_sla_ths = {}
         for vm in vms:
-            vm.sla = sla
-            vm_sla[vm] = sla
-            vm_sla_th[vm] = self._get_sla_th(vm, sla)
+            vm_sla_ths[vm] = self._get_sla_th(vm)
 
-        return [vm_sla, vm_sla_th]
+        return vm_sla_ths
 
-    def _get_sla_th(self, vm, sla):
-        duration = self.vm_duration[vm].total_seconds() / 3600
-        return duration*(1-sla / 100.0)
+    def _get_sla_th(self, vm):
+        """get list of sla penalty thresholds (in seconds)
+        applicable to the given vm based on its expected 
+        total duration
+        """
+        duration = self.vm_duration[vm].total_seconds()
+        penalty_mappings = self._get_sla_penalty_mapping(vm.sla)
+        sla_ths = []
+        for pen_level in penalty_mappings:
+            sla_ths.append(duration*(1 - pen_level / 100.0))
+        return sla_ths
 
+    def get_sla_penalty(self, vm):
+        """get penalty applicable for this vm 
+        based on its accumulated downtime
+        """
+        if vm.downtime > self.vm_sla_ths[vm][2]:
+            return 1.5
+        if vm.downtime > self.vm_sla_ths[vm][1]:
+            return 1.25
+        if vm.downtime > self.vm_sla_ths[vm][0]:
+            return 1.1
+
+    def _get_sla_penalty_mapping(self, sla):
+        """get sla penalty mapping for each defined sla
+        to decide when a new penalty schema should be applied
+        """
+        if sla == 99.95:
+            return [99.95, 99, 95]
+        if sla == 99.9:
+            return [99.9, 99, 95]
+        if sla == 99:
+            return [99, 98, 95]
+
+    def update_sla(self, vm):
+        if vm.penalties < 3 and \
+            vm.downtime > self.vm_sla_ths[vm][vm.penalties]:
+                vm.penalties += 1
 
 
 class GASimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):

@@ -99,6 +99,31 @@ end = times[-1]
 
 custom_weights = None
 
+
+bandwidth = 1000
+# map locations to bandwidth value
+# if empty, bandwidth will be assigned a fixed value
+bandwidth_map = {}
+
+
+### simulation parameters ###
+
+# dirty page rates applied to vms
+dpr_values = [40]
+# possible slas to apply to vms
+sla_values = [99.95,99.9,99]
+# list of distinct vm duration values (in hours)
+# if None they will be assigned by a resource distribution
+duration_values = None
+# indicates whether different dirty page rates should be assigned to vms
+generate_dpr = False
+# indicates whether different sla values should be assigned to vms
+generate_sla = False
+# indicates whether fixed duration values (see above) should be used
+fixed_duration = False
+# indicates whether it is possible that vms run for the whole duration of the simulation
+total_duration = False
+# indicates whether the sla status of vms should be continuously updated in the simulator
 update_vm_sla = False
 
 
@@ -337,6 +362,28 @@ prices_in_mwh = False
 alternate_cost_model = False
 
 location_based = False
+
+
+#################################
+#####   Utility function    #####
+#################################
+
+#### Defining CONSTANTS ####
+
+max_fc_horizon = 12
+
+# weights
+
+w_sla = 0.4
+w_energy = 0.1
+w_vm_rem = 0.4
+w_dcload = 0.2
+w_cost = 0.9
+
+# threshold for deciding on vm migration
+
+utility_threshold = 0.8
+
 
 # Benchmark
 #===========

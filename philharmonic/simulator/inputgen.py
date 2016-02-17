@@ -79,8 +79,7 @@ def distribution_population_fixed(num, ceil=True, distribution='uniform', values
         else: 
             uniform_idx = np.random.uniform(0, len(values), num)
 
-        values_result = np.empty_like (uniform_idx)
-        values_result[:] = uniform_idx
+        values_result = range(len(uniform_idx))
 
         for i in range(len(uniform_idx)):
             values_result[i] = values[uniform_idx[i]]
@@ -357,13 +356,11 @@ def normal_vmreqs_interval(start, end, vm_req_interval='5min', **kwargs):
     events = pd.TimeSeries(data=requests, index=moments)
     return events.sort_index()
 
-def uniform_vmreqs(start, end, round_to_hour=True, fixed_duration=True, total_duration=False, **kwargs):
+def uniform_vmreqs(start, end, round_to_hour=True, **kwargs):
     """Generate the VM creation and deletion events in.
     Uniformly distributed arrays - VM sizes and durations.
     @param start, end - time interval (events within it)
-    @param fixed_duration if true then values will unfiformly distribute 
-    over a fixed set of durations, else the distribution will take into 
-    account min_duration and max_duration values
+    @param round_to_hour if vm durations should be rounded to full hours
     @author Andreas Egger
 
     """
@@ -374,10 +371,18 @@ def uniform_vmreqs(start, end, round_to_hour=True, fixed_duration=True, total_du
                                         distribution=resource_distribution)
     ram_sizes = distribution_population(VM_num, min_ram, max_ram,
                                         distribution=resource_distribution)
-    
-    if fixed_duration: 
-        duration_values = [1,2,5,8,12,24,48] # fixed set of durations, 1000 denotes "infinite" duration
-        if total_duration:
+    if conf.generate_dpr:
+        dpr_values = conf.dpr_values
+        dprs = distribution_population_fixed(VM_num, distribution=resource_distribution, 
+                                        values=dpr_values)
+    if conf.generate_sla:
+        sla_values = conf.sla_values
+        slas = distribution_population_fixed(VM_num, distribution=resource_distribution, 
+                                        values=sla_values)
+    import ipdb; ipdb.set_trace()
+    if conf.fixed_duration and conf.duration_values is not None:
+        duration_values = conf.duration_values # fixed set of durations
+        if conf.total_duration: # vms for the whole duration of the simulation
             total_hours = delta.total_seconds() / 3600
             duration_values.append(total_hours)
         duration_values = np.array(duration_values) * 3600 # get durations in seconds
@@ -390,8 +395,15 @@ def uniform_vmreqs(start, end, round_to_hour=True, fixed_duration=True, total_du
     
     requests = []
     moments = []
+
+    idx = 0
+
     for cpu_size, ram_size, duration in zip(cpu_sizes, ram_sizes, durations):
         vm = VM(ram_size, cpu_size)
+        if conf.generate_dpr:
+            vm.dpr = dprs[idx]
+        if conf.generate_sla: 
+            vm.sla = slas[idx]
         # the moment a VM is created
         offset = pd.offsets.Second(np.random.uniform(0., delta.total_seconds()))
         requests.append(VMRequest(vm, 'boot'))
@@ -405,6 +417,8 @@ def uniform_vmreqs(start, end, round_to_hour=True, fixed_duration=True, total_du
                 minute = t.minute - (t.minute % 5)
                 t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour) + pd.offsets.Minute(minute)
         moments.append(t)
+
+        idx += 1
 
         # new offset from the new timestamp t
         offset = t - start

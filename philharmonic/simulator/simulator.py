@@ -182,10 +182,7 @@ class Simulator(IManager):
         """update state of vms concerning accumulated downtime and sla penalties"""
         vms = self.cloud.get_current().vms
         for vm in vms:
-            sla_th = self.environment.vm_sla_th[vm]
-            if vm.downtime > sla_th:
-                vm.downtime = vm.downtime - sla_th
-                vm.penalties += 1
+            sla_th = self.environment.update_sla(vm)
 
     def prompt(self):
         if conf.prompt_show_cloud:

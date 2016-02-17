@@ -16,6 +16,7 @@ import math
 
 from philharmonic.utils import deprecated, CommonEqualityMixin
 from philharmonic.cloud import visualiser
+import philharmonic as ph
 
 def format_spec(spec):
     """Return a string containing the resource
@@ -107,9 +108,10 @@ class VM(Machine):
         self.server = None
         # beta or CPU-boundedness: 1. CPU-bounded, towards 0. not CPU-bounded
         self.beta = 1.
-        self.downtime = 0
-        self.penalties = 0
-        self.sla = 99.95 # static for now
+        self.downtime = 0 # accumulated downtime up to a penalty
+        self.penalties = 0 # number of penalties for this vm
+        self.sla = 99.95 # sla contract for this vm
+        self.dpr = 40 # dirty page rate
 
     def __repr__(self):
         s = "{}:{}".format(self.machine_type, str(self.id))
@@ -119,21 +121,13 @@ class VM(Machine):
             pass
         return s
 
+    # def get_dirty_page_rate(self):
+    #     return self._dpr
 
-    # def get_downtime(self):
-    #     return self.downtime
+    # def set_dirty_page_rate(self, dirty_page_rate):
+    #     self._dpr = dirty_page_rate
 
-    # def set_downtime(self, dt):
-    #     self.downtime = dt
-
-    # def get_penalties(self):
-    #     return self.penalties
-
-    # def set_penalties(self, p):
-    #     self.penalties = p
-
-    # downtime = property(get_downtime, set_downtime, doc="accumulated downtime experienced by this VM")
-    # penalties = property(get_penalties, set_penalties, doc="number of penalties experienced by this VM")
+    # dpr = property(get_dirty_page_rate, set_dirty_page_rate, doc="dirty page rate of vm")
 
 
     # calling (un)pause or migrate on a VM gets routed to the cloud
@@ -221,6 +215,7 @@ class State(object):
             self._alloc[s] = set()
         if auto_allocate:
             self.auto_allocate()
+        # optional dict for mapping each pair of locations to a bandwidth value
 
     def __repr__(self):
         rep = ''
@@ -230,23 +225,6 @@ class State(object):
                                             self._alloc[s])
             rep += s_rep
         return rep
-
-    ### constants and functions for migration calculation ###
-    _KWH_RATIO = 3.6e6
-    alpha = 0.512
-    beta = 20.165
-    joul2kwh = lambda self, jouls : jouls / _KWH_RATIO
-    E_mig = lambda self, V_mig : alpha*V_mig + beta
-    V_mig = lambda self, V_mem, R, D, n : V_mem * (1-(D/float(R/8.))**(n+1))/(1-D/float(R/8.))
-    T_mig = lambda self, V_mig, R : V_mig/(R/8.) # R assumed to be in Mb/s
-    T_n = lambda self, V_mem, R, D, n : V_mem * ((D/float(R/8.))**(n)) / (R/8.)
-    T_resume = 50 # in ms
-    n_max = 10 # max iterations before pre-copying phase finishes
-    # constants
-    # planned: R values 1000, 800 and 400 (in Mbit/s)
-    R, D = 1000, 40 # (D in Mbyte/s)
-    V_thd = 100 # MB; treshold after which post-copying starts
-    ####
 
     @property
     def alloc(self):
@@ -314,7 +292,6 @@ class State(object):
         # add it to the new one
         if s is not None: # if s is None, vm is being deleted
             self.place(vm, s)
-            self.add_downtime(vm)
         # TODO: faster reverse-dictionary lookup
         # http://stackoverflow.com/a/2569076/544059
         return self
@@ -454,30 +431,6 @@ class State(object):
     def calculate_prices(self):
         """Return dict vm -> price."""
         return {vm: vm.price for vm in self.vms}
-
-    def add_downtime(self, vm):
-        """Add downtime for current migration to vm."""
-        d_pred = self.calculate_predicted_downtime(vm)
-        vm.downtime = vm.downtime + d_pred
-
-    def calculate_predicted_downtime(self, vm):
-        """
-        Calculate the predicted downtime for this VM
-        based on the current memory consumption, 
-        dirty page rate and bandwidth
-        """
-        memory = vm.res['RAM'] * 1000 # MB
-        try:
-            n = int(math.ceil(math.log(self.V_thd/float(memory),
-                                       self.D/float(self.R/8.))))
-            if n > self.n_max:
-                n = self.n_max
-        except ZeroDivisionError:
-            n = 1 # TODO: check what raises this error
-        # Typically add 1/3 of memory to get migration data
-        stop_time = self.T_n(memory, self.R, self.D, n)
-        T_down = stop_time + self.T_resume
-        return T_down
 
     # constraint checking
     # C1

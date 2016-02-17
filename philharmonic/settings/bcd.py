@@ -36,11 +36,11 @@ inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 8 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 200
+inputgen_settings['VM_num'] = 100
 inputgen_settings['min_cpu'] = 1 # 2,
 inputgen_settings['max_cpu'] = 2 # 4,
-inputgen_settings['min_ram'] = 1 # 4,
-inputgen_settings['max_ram'] = 4 # 16,
+inputgen_settings['min_ram'] = 0.5 # 4,
+inputgen_settings['max_ram'] = 2 # 16,
 
 # inputgen_settings['min_duration'] = 60 * 5 # 5 minute
 # inputgen_settings['max_duration'] = 3600 * 2 # 2 hours
@@ -51,6 +51,7 @@ inputgen_settings['max_ram'] = 4 # 16,
 # inputgen_settings['min_duration'] = 60 * 60 # 1 hour
 # inputgen_settings['max_duration'] = 60 * 60 * 3 # 3 hours
 
+# only take into account when fixed_duration is False
 inputgen_settings['min_duration'] = 60 * 60 * 1 
 inputgen_settings['max_duration'] = 60 * 60 * 5 # 5 hours
 
@@ -68,10 +69,20 @@ inputgen_settings['show_beta_value'] = False
 
 # DATA_LOC_SIM_DA: DA input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
 # DATA_LOC_SIM_RT: RT input from USA (ISO-NE, PJM)
-DATA_LOC = DATA_LOC_SIM_DA
 
-el_price_dataset = os.path.join(DATA_LOC, 'prices_da_all.csv')
-el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc_all.csv')
+sim_type = "DA" # DA or RT
+
+if sim_type == "DA":
+	DATA_LOC = DATA_LOC_SIM_DA
+
+	el_price_dataset = os.path.join(DATA_LOC, 'prices_da_all.csv')
+	el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc_all.csv')
+
+elif sim_type == "RT":
+	DATA_LOC = DATA_LOC_SIM_RT
+
+	el_price_dataset = os.path.join(DATA_LOC, 'prices_rt_all.csv')
+	el_price_forecast = os.path.join(DATA_LOC, 'prices_rt_fc_all.csv')
 
 add_date_to_folders = True
 
@@ -79,6 +90,103 @@ dynamic_locations = True
 
 prompt_configuration = True
 
+
+
+
+
+#################################
+#####	Utility function 	#####
+#################################
+
+#### Defining CONSTANTS ####
+
+max_fc_horizon = 12
+
+# weights
+
+w_sla = 0.8
+w_energy = 0.1
+w_vm_rem = 0.4
+w_dcload = 0.2
+w_cost = 0.9
+
+# threshold for deciding on vm migration
+
+utility_threshold = 0.8
+
+
+
+### simulation parameters ###
+
+# dirty page rates applied to vms
+dpr_values = [20,40,70,90]
+# possible slas to apply to vms
+sla_values = [99.95,99.9,99]
+# list of distinct vm duration values (in hours)
+# if None they will be assigned by a resource distribution
+duration_values = [1,2,5,8,12,24,48]
+# indicates whether different dirty page rates should be assigned to vms
+generate_dpr = True
+# indicates whether different sla values should be assigned to vms
+generate_sla = True
+# indicates whether fixed duration values (see above) should be used
+fixed_duration = True
+# indicates whether it is possible that vms run for the whole duration of the simulation
+total_duration = True
+# indicates whether the sla status of vms should be continuously updated in the simulator
+update_vm_sla = True
+
+
+
+bandwidth_da = {
+	'Hamina': {
+		'Potsdam': 1000, 'St.Ghislain': 800, 'Portland': 400, 'Boston': 400
+	},
+	'Potsdam': {
+		'Hamina': 1000, 'St.Ghislain': 800, 'Portland': 400, 'Boston': 400
+	},
+	'St.Ghislain': {
+		'Hamina': 1000, 'Potsdam': 800, 'Portland': 400, 'Boston': 400
+	},
+	'Portland': {
+		'Hamina': 400, 'St.Ghislain': 400, 'Potsdam': 400, 'Boston': 800
+	},
+	'Boston': {
+		'Hamina': 400, 'St.Ghislain': 400, 'Potsdam': 400, 'Portland': 800
+	}
+}
+
+bandwidth_rt = {
+	'Portland': {
+		'Boston': 800, 'Richmond': 400, 'Brighton': 400, 'Hatfield': 400, 'Madison': 400, 'Georgetown': 400
+	},
+	'Boston': {
+		'Portland': 800, 'Richmond': 400, 'Brighton': 400, 'Hatfield': 400, 'Madison': 400, 'Georgetown': 400
+	},
+	'Richmond': {
+		'Brighton': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+	},
+	'Brighton': {
+		'Richmond': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+	},
+	'Hatfield': {
+		'Richmond': 1000, 'Brighton': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+	},
+	'Madison': {
+		'Richmond': 1000, 'Brighton': 1000, 'Hatfield': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+	},
+	'Georgetown': {
+		'Richmond': 1000, 'Brighton': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Portland': 400, 'Boston': 400
+	}
+}
+
+# if empty, bandwidth will be assigned a fixed value
+bandwidth_map = {}
+if sim_type == "DA":
+	bandwidth_map = bandwidth_da
+
+elif sim_type == "RT":
+	bandwidth_map = bandwidth_rt
 
 
 power_freq_model = False
@@ -90,7 +198,6 @@ transform_to_jouls = False
 prices_in_mwh = True
 alternate_cost_model = True
 location_based = True
-update_vm_sla = True
 
 # show_cloud_interval = pd.offsets.Hour(12) # interval at which simulation output should be done
 
@@ -115,7 +222,7 @@ factory['clean_requests'] = False
 plotserver = False
 
 # show plots on the fly instead of saving to a file (pdf)
-plot_live = True
+plot_live = False
 
 if plot_live:
     liveplot = True

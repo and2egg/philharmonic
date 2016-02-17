@@ -59,6 +59,26 @@ R, D = 1000, 300
 V_thd = 100 # MB; treshold after which post-copying starts
 
 
+### constants and functions for custom migration calculation ###
+# total migration energy
+E_mig_custom = lambda V_mig : alpha*V_mig + beta
+# total migration load, R assumed to be in Mbit/s, D in Mbyte/s
+V_mig_custom = lambda V_mem, R, D, n : V_mem * (1-(D/float(R/8.))**(n+1))/(1-D/float(R/8.))
+# migration time, R assumed to be in Mbit/s
+T_mig_custom = lambda V_mig, R : V_mig/(R/8.)
+# migration time for the nth iteration, R assumed to be in Mbit/s, D in Mbyte/s
+T_n = lambda V_mem, R, D, n : V_mem * ((D/float(R/8.))**(n)) / float(R/8.)
+# vm resume time after migration
+T_resume = 0.05 # in seconds
+# max iterations before pre-copying phase finishes
+n_max = 10
+# constants
+# if not static, read R values from bandwidth_map in conf (in Mbit/s)
+R_custom, D_custom = 1000, 40 # (R in Mbit/s, D in Mbyte/s)
+V_thd = 100 # MB; treshold after which post-copying starts
+####
+
+
 def calculate_migration_cost(vm, price_before, price_after):
     mean_el_price = (price_before + price_after) / 2.
     memory = vm.res['RAM'] * 1000 # MB
@@ -82,6 +102,68 @@ def calculate_migration_time(vm, bandwidth=100):
     """
     seconds = vm.res['RAM'] * 1000 / (bandwidth/8.)
     return seconds
+
+def calculate_predicted_downtime(vm, loc, bandwidth_map={}):
+    """
+    Calculate the predicted downtime for this VM
+    based on the current memory consumption, 
+    dirty page rate and bandwidth
+    """
+    memory = vm.res['RAM'] * 1000 # MB
+    if len(bandwidth_map) == 0:
+        bandwidth = R
+    else:
+        loc1 = vm.server.loc
+        loc2 = loc
+        bandwidth = bandwidth_map[loc1][loc2]
+    try:
+        if vm.dpr >= (bandwidth / 8.):
+            n = 0 # migrate all vm memory in one step
+        else:
+            # get the estimated pre-copy iteration for reaching a defined threshold V_thd
+            n = int(math.ceil(math.log(V_thd/float(memory),
+                                       vm.dpr/float(bandwidth))))
+        if n > n_max:
+            n = n_max
+    except ZeroDivisionError:
+        n = 1 # TODO: check what raises this error
+    # calculate time of pre-copy iteration n
+    stop_time = T_n(memory, bandwidth, vm.dpr, n)
+    T_down = stop_time + T_resume
+    return T_down
+
+def calculate_migration_energy(vm, loc, bandwidth_map={}):
+    """utility criteria
+    Calculate the migration energy (in Joules) for this VM
+    based on the current memory consumption, 
+    dirty page rate and bandwidth from the location
+    it should be migrated to
+    """
+    memory = vm.res['RAM'] * 1000 # MB
+    if len(bandwidth_map) == 0:
+        bandwidth = R
+    else:
+        loc1 = vm.server.loc
+        loc2 = loc
+        bandwidth = bandwidth_map[loc1][loc2]
+    try:
+        if vm.dpr >= (bandwidth / 8.):
+            n = n_max
+        else:
+            # get the estimated pre-copy iteration for reaching a defined threshold V_thd
+            n = int(math.ceil(math.log(V_thd/float(memory),
+                                       vm.dpr/float(bandwidth))))
+        if n > n_max:
+            n = n_max
+    except ZeroDivisionError:
+        n = 1 # TODO: check what raises this error
+    # Typically add 1/3 of memory to get migration data
+    if vm.dpr >= (bandwidth / 8.):
+        migration_data = memory*n_max
+    else:
+        migration_data = V_mig_custom(memory, bandwidth, vm.dpr, n)
+    energy = E_mig_custom(migration_data)
+    return energy
 
 
 def calculate_util(active_cores, util_active_cores):

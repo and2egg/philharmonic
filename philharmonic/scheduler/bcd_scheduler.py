@@ -16,53 +16,6 @@ class BCDScheduler(IScheduler):
     """
 
 
-    #### Defining CONSTANTS ####
-
-    max_fc_horizon = 12
-
-
-
-    #### Defining utility function ####
-
-
-    w_sla = 0.4
-    w_energy = 0.1
-    w_vm_rem = 0.4
-    w_dcload = 0.2
-    w_cost = 0.9
-
-    utility_threshold = 0.8
-
-    utility = {}
-
-    utility["sla_penalty"] = []
-    utility["migration_energy"] = []
-    utility["remaining_vm"] = []
-    utility["dcloads"] = []
-    utility["cost_benefit"] = []
-
-    utility["result"] = []
-
-
-    ### constants and functions for migration calculation ###
-    _KWH_RATIO = 3.6e6
-    alpha = 0.512
-    beta = 20.165
-    joul2kwh = lambda self, jouls : jouls / self._KWH_RATIO
-    E_mig = lambda self, V_mig : self.alpha*V_mig + self.beta
-    V_mig = lambda self, V_mem, R, D, n : V_mem * (1-(D/float(R/8.))**(n+1))/(1-D/float(R/8.))
-    T_mig = lambda self, V_mig, R : V_mig/(R/8.) # R assumed to be in Mb/s
-    T_n = lambda self, V_mem, R, D, n : V_mem * ((D/float(R/8.))**(n)) / (R/8.)
-    T_resume = 50 # in ms
-    n_max = 10 # max iterations before pre-copying phase finishes
-    # constants
-    # planned: R values 1000, 800 and 400 (in Mbit/s)
-    R, D = 1000, 40 # (R in Mbit/s, D in Mbyte/s)
-    V_thd = 100 # MB; treshold after which post-copying starts
-    ####
-    
-
-
     def __init__(self, cloud=None, driver=None):
         IScheduler.__init__(self, cloud, driver)
 
@@ -182,6 +135,15 @@ class BCDScheduler(IScheduler):
                 print "Server {} chosen at location {}".format(server, server.loc)
                 return server
 
+    def find_host_for_vm(self, vm, loc):
+        servers = [s for s in self.cloud.servers if s.loc == loc]
+        for server in servers:
+            utilisation = self._fits(vm, server)
+            if utilisation != -1:
+                return server
+        return None
+
+
     def _find_cheapest_host(self, vm, current_loc=None, forecast=False, ideal=False, weighted=False):
         """Find cheapest host, 
         if forecast is True 
@@ -272,35 +234,68 @@ class BCDScheduler(IScheduler):
                 migration_vms.append(vm)
         return migration_vms
 
-    # def get_migration_vms(self, t_next, scenario, weighted=False):
-    #     if scenario == 1:
-    #         return []
-    #     elif scenario == 2: 
-    #         return []
-    #     elif scenario == 3: 
-    #         return []
-    #     elif scenario == 4: 
-    #         return self._get_migration_vms(t_next)
-    #     elif scenario == 5: 
-    #         return self._get_migration_vms(t_next, forecast=True, weighted=weighted)
-    #     elif scenario == 6: 
-    #         return self._get_migration_vms(t_next, forecast=True, ideal=True, weighted=weighted)
-
-
-
 
 
 
     ######  Utility preparation functions  ######
 
-    def _calculate_price_differences(self, t_next, prices, fc_prices, min_h, max_h):
+    def _get_probability_of_sla_penalty(self, vm, loc):
+        """utility criteria
+        retrieves the probability of an sla penalty
+        given this vm's current memory, dirty page rate
+        and the bandwidth connection from the location
+        it should be migrated to
+        """
+        down_acc = vm.downtime
+        down_pred = ph.calculate_predicted_downtime(vm, loc, conf.bandwidth_map)
+        
+        if vm.penalties < 3:
+            sla_th = self.environment.vm_sla_ths[vm][vm.penalties]
+            if (down_acc + down_pred) < sla_th:
+                prob_pen = (down_acc + down_pred) / float(sla_th)
+            else:
+                prob_pen = 1
+        else:
+            prob_pen = 1
+        return prob_pen
 
+    def calculate_migration_energy(self, vm, loc):
+        return ph.calculate_migration_energy(vm, loc, conf.bandwidth_map)
+
+    def add_downtime(self, vm, loc):
+        """Add predicted downtime for migration of vm to location loc."""
+        d_pred = ph.calculate_predicted_downtime(vm, loc, conf.bandwidth_map)
+        vm.downtime = vm.downtime + d_pred
+
+    def _get_dc_load(self):
+        """utility criteria
+        retrieves the current loads (utilisation) in all locations
+        and returns a dict of loads and the location with currently
+        maximum utilisation as tuple, (loc, util)
+        """
+        state = self.cloud.get_current()
+        util = state.calculate_utilisations_per_location()
+        max_util = max(util.items(), key=lambda x: x[1])
+        return [util, max_util]
+
+    def get_relative_dc_load(self, dc_loads, loc):
+        """get the relative load (utilisation) for location loc
+        to the maximum utilisation of all locations
+        """
+        return dc_loads[0][loc] / float(dc_loads[1][1])
+
+    def _calculate_price_differences(self, t_next, prices, fc_prices, min_h, max_h, normalise=True):
+        """calculate the price differences between each two different
+        locations given a minimum and maximum forecast horizon.
+        the maximum cost benefit for a vm is defined as migrating to 
+        a location compared to which the price differences are highest
+        """
         def _create_dict(locations, min_h, max_h):
             d = {}
-            for h in range(min_h,max_h+1):
+            for h in range(min_h,max_h+1): # range is exclusive last value, therefore +1
                 d[h] = {}
                 for l in locations: 
-                    d[h][l] = []
+                    d[h][l] = {}
             return d
 
         def _normaliseMeanError(me, min_me, max_me):
@@ -312,12 +307,11 @@ class BCDScheduler(IScheduler):
         min_ME = None
         max_ME = None
         d = _create_dict(locations, min_h, max_h)
-        fc_start = t_next - period # current time stamp
-
+        eval_start = t_next # next time stamp
 
         # calculate mean errors for each pair of locations and for each forecast horizon
-        for h in range(min_h,max_h+1):
-            curr_h = t_next+period*h
+        for h in range(min_h,max_h+1): # range is exclusive last value, therefore +1
+            curr_h = eval_start+period*h
             visited = {}
             for l in locations:
                 visited[l] = False
@@ -325,115 +319,63 @@ class BCDScheduler(IScheduler):
             for l in d[h]:
                 for other in d[h]:
                     if other != l and not visited[other]:
-                        if h == 0: # no forecast
-                            vec1 = prices[l][fc_start : curr_h]
-                            vec2 = prices[other][fc_start : curr_h]
-                        else:
-                            vec1 = fc_prices[l][fc_start : curr_h]
-                            vec2 = fc_prices[other][fc_start : curr_h]
+                        # if h == 0: # no forecast
+                        #     vec1 = prices[l][eval_start : curr_h]  # range 0:0 -> item 1, inclusive
+                        #     vec2 = prices[other][eval_start : curr_h]
+                        # else:
+                        vec1 = fc_prices[l][eval_start : curr_h]
+                        vec2 = fc_prices[other][eval_start : curr_h]
 
                         mean_error = sum([v[0] - v[1] for v in zip(vec1,vec2)]) # mean error
 
-                        d[h][l].append((l,mean_error))          # append tuple of location and mean error
-                        d[h][other].append((l,-mean_error))     # append tuple of location and mean error
+                        # d[h][l].append((l,mean_error))          # append tuple of location and mean error
+                        # d[h][other].append((l,-mean_error))     # append tuple of location and mean error
 
-                        # d[h][l][other] = mean_error         # append tuple of location and mean error
-                        # d[h][other][l] = -mean_error     # append tuple of location and mean error
+                        d[h][l][other] = mean_error         # set mean error for this combination of fc horizon, 
+                        d[h][other][l] = -mean_error        # location l (from) and location other (to) migration action
+                                                            # ... the (-) means negation, not setting the number as negative
+                        test = 2
 
                 visited[l] = True
 
         # for each fc horizon h and location l save a tuple of (location, maximum mean error)
-        for h in range(min_h,max_h+1):
+        for h in range(min_h,max_h+1): # range is exclusive last value, therefore +1
             for l in locations: 
-                min_T = min(d[h][l], key=lambda x: x[1])  # tuple of location and minimum ME value
-                max_T = max(d[h][l], key=lambda x: x[1])  # tuple of location and maximum ME value
+                min_T = min(d[h][l].items(), key=lambda x: x[1])  # tuple of location and minimum ME value
+                max_T = max(d[h][l].items(), key=lambda x: x[1])  # tuple of location and maximum ME value
                 if min_ME is None or min_T[1] < min_ME:
                     min_ME = min_T[1]
-                if max_ME is None or max_T[1] < max_ME:
+                if max_ME is None or max_T[1] > max_ME:
                     max_ME = max_T[1]
-                d[h][l] = max_T
 
-        # normalise values to min and max mean errors
-        for h in range(min_h,max_h+1):
-            for l in locations: 
-                item = d[h][l]
-                # return new tuple of location and normalised mean error
-                d[h][l] = (item[0], _normaliseMeanError(item[1], min_ME, max_ME))
+        if normalise:
+            # normalise values to min and max mean errors
+            for h in range(min_h,max_h+1): # range is exclusive last value, therefore +1
+                for l in locations: 
+                    mean_errors = d[h][l].items()
+                    for me in mean_errors:
+                        loc = me[0]
+                        err = me[1]
+                        d[h][l][loc] = _normaliseMeanError(err, min_ME, max_ME)
 
         return d
 
 
-    def _get_probability_of_sla_penalty(self, vm):
-        down_acc = vm.downtime
-        down_pred = self.calculate_predicted_downtime(vm)
-        sla_th = self.environment.vm_sla_th[vm]
-        pen_sla = 1
-        if (down_acc + down_pred) < sla_th:
-            pen_sla = (down_acc + down_pred) / float(sla_th)
-        return pen_sla
-
-    def _get_dc_load(self):
-        state = self.cloud.get_current()
-        util = state.calculate_utilisations_per_location()
-        max_util = max(util.items(), key=lambda x: x[1])
-        return [util, max_util]
-
-
-    def get_relative_dc_load(self, dc_loads, loc):
-        return dc_loads[0][loc] / float(dc_loads[1][1])
-
-
-    def calculate_predicted_downtime(self, vm):
-        """
-        Calculate the predicted downtime for this VM
-        based on the current memory consumption, 
-        dirty page rate and bandwidth
-        """
-        memory = vm.res['RAM'] * 1000 # MB
-        try:
-            n = int(math.ceil(math.log(self.V_thd/float(memory),
-                                       self.D/float(self.R/8.))))
-            if n > self.n_max:
-                n = self.n_max
-        except ZeroDivisionError:
-            n = 1 # TODO: check what raises this error
-        # Typically add 1/3 of memory to get migration data
-        stop_time = self.T_n(memory, self.R, self.D, n)
-        T_down = stop_time + self.T_resume
-        return T_down
-
-
-    def calculate_migration_energy(self, vm):
-        """
-        Calculate the migration energy for this VM
-        based on the current memory consumption, 
-        dirty page rate and bandwidth
-        """
-        memory = vm.res['RAM'] * 1000 # MB
-        try:
-            n = int(math.ceil(math.log(self.V_thd/float(memory),
-                                       self.D/float(self.R/8.))))
-            if n > self.n_max:
-                n = self.n_max
-        except ZeroDivisionError:
-            n = 1 # TODO: check what raises this error
-        # Typically add 1/3 of memory to get migration data
-        migration_data = self.V_mig(memory, self.R, self.D, n)
-        energy = self.E_mig(migration_data) # Joules
-        return energy
-
-
     def _prepare_utility_function(self, t_next, forecast=False, ideal=False):
+        """prepare all criterias to be evaluated in a 
+        utility function. Do this in a common method
+        to save computation time (iterate over the set
+        of vms just once)
+        """
         prices = self.environment.el_prices
         current = self.cloud.get_current()
 
         vms = self.cloud.get_vms()
         if len(vms) == 0:
             return {}
-        # clear vms of all vms located at the currently cheapest location
-        vms = vms.difference(current.unallocated_vms())
-        if len(vms) == 0:
-            return {}
+        # vms = vms.difference(current.unallocated_vms())
+        # if len(vms) == 0:
+        #     return {}
 
         prices = self.environment.el_prices
         fc_prices = self.environment.forecast_el
@@ -444,9 +386,9 @@ class BCDScheduler(IScheduler):
         locations = fc_prices.axes[1]
 
         min_h = 0
-        max_h = 0
+        max_h = 0 # inclusive
         if forecast:
-            max_h = self.max_fc_horizon
+            max_h = conf.max_fc_horizon-1
 
         fc_dict = self._calculate_price_differences(t_next, prices, fc_prices, min_h, max_h)
         
@@ -456,32 +398,63 @@ class BCDScheduler(IScheduler):
         cloud_util = self._get_dc_load()
         cost_benefit = {}
 
+        sla_penalty_per_loc = {}
+        mig_energy_per_loc = {}
+        cost_benefit_per_loc = {}
+
         migration_vms = []
+        not_migrated_vms = []
+
+        for loc in locations:
+            sla_penalty_per_loc[loc] = {}
+            mig_energy_per_loc[loc] = {}
+            cost_benefit_per_loc[loc] = {}
 
         for vm in vms:
 
             vm_remaining = self.environment.get_remaining_duration(vm, t_next)
             vm_remaining = int(vm_remaining.total_seconds() / 3600)
-            if vm_remaining <= 1:
+            if vm_remaining <= 0:
+                not_migrated_vms.append(vm)
                 continue
 
-            # preparing sla penalty criteria
-            sla_penalty[vm] = self._get_probability_of_sla_penalty(vm)
-
-            # preparing migration energy criteria
-            mig_energy[vm] = self.calculate_migration_energy(vm)
-
             # preparing remaining duration criteria
-            remaining_dur[vm] = self.environment.get_remaining_duration(vm, t_next).total_seconds() / 3600
-
-            # preparing cost benefit criteria
-            max_fc = min(vm_remaining-1, self.max_fc_horizon)
+            remaining_dur[vm] = vm_remaining
+            max_fc = min(vm_remaining, conf.max_fc_horizon-1)
             current_loc = current.allocation(vm).loc
-            cost_benefit[vm] = fc_dict[max_fc][current_loc]
 
-            migration_vms.append(vm)
+            sla_penalty[vm]     = {}
+            mig_energy[vm]      = {}
+            cost_benefit[vm]    = {}
 
-        return [migration_vms, sla_penalty, mig_energy, remaining_dur, cloud_util, cost_benefit]
+            for loc in locations:
+                if loc != current_loc:
+                    # preparing sla penalty criteria
+                    sla_penalty[vm][loc] = self._get_probability_of_sla_penalty(vm, loc)
+
+                    # preparing migration energy criteria
+                    mig_energy[vm][loc] = self.calculate_migration_energy(vm, loc) # in Joules
+
+                    # preparing cost benefit criteria
+                    cost_benefit[vm][loc] = fc_dict[max_fc][current_loc][loc]   # get possible cost benefit for vm and all other locations
+                                                                                # than current_loc
+                    sla_penalty_per_loc[loc][vm] = sla_penalty[vm][loc]
+                    mig_energy_per_loc[loc][vm] = mig_energy[vm][loc]
+                    cost_benefit_per_loc[loc][vm] = cost_benefit[vm][loc]
+
+                else:
+                    sla_penalty[vm][loc] = None
+                    mig_energy[vm][loc] = None
+                    cost_benefit[vm][loc] = None
+
+                    sla_penalty_per_loc[loc][vm] = None
+                    mig_energy_per_loc[loc][vm] = None
+                    cost_benefit_per_loc[loc][vm] = None
+
+        migration_vms = vms.difference(not_migrated_vms)
+
+        return [migration_vms, sla_penalty, mig_energy, remaining_dur, cloud_util, cost_benefit,  \
+                    sla_penalty_per_loc, mig_energy_per_loc, cost_benefit_per_loc]
 
 
     def calculate_utility_function(self, t_next, forecast=False, ideal=False):
@@ -489,46 +462,56 @@ class BCDScheduler(IScheduler):
         current = self.cloud.get_current()
         result = self._prepare_utility_function(t_next, forecast, ideal)
         
-        if len(result) == 0:
-            return []
-        if(len(result[0]) == 0 or len(result[1]) == 0 or len(result[2]) == 0 or len(result[3]) == 0 or len(result[5]) == 0):
+        if  len(result)    == 0 or len(result[0]) == 0 or len(result[1]) == 0 or \
+            len(result[2]) == 0 or len(result[3]) == 0 or len(result[5]) == 0:
             return []
 
-        [migration_vms, sla_pen,mig_energy,remaining_dur,cloud_util,estimated_savings] = result
+        [migration_vms, sla_pen,mig_energy,remaining_dur,cloud_util,estimated_savings,  \
+            sla_penalty_per_loc, mig_energy_per_loc, cost_benefit_per_loc ] = result
+
+        fc_prices = self.environment.forecast_el
+        locations = fc_prices.axes[1]
 
         max_rem = max(remaining_dur.items(), key=lambda x:x[1])[1]
-        max_estimated_savings = max(estimated_savings.items(), key=lambda x:x[1][1])[1][1]
-        max_mig_energy = max(mig_energy.items(), key=lambda x:x[1])[1]
+
+        max_estimated_savings = {}
+        max_mig_energy = {}
+
+        for loc in locations:
+            max_mig_energy[loc] = max(mig_energy_per_loc[loc].items(), key=lambda x: x[1])[1]
+            max_estimated_savings[loc] = max(cost_benefit_per_loc[loc].items(), key=lambda x: x[1])[1]
+            # max_estimated_savings = max(estimated_savings.items(), key=lambda x:x[1][1])[1][1]
+            # max_mig_energy = max(mig_energy.items(), key=lambda x:x[1])[1]
 
         vms = migration_vms
 
         u_result = []
 
         for vm in vms:
+            current_loc = vm.server.loc
 
-            sla_penalty = sla_pen[vm]
-            migration_energy = self.joul2kwh(mig_energy[vm] / max_mig_energy)
-            remaining_vm = remaining_dur[vm] / float(max_rem)
-            dcload = self.get_relative_dc_load(cloud_util, current.allocation(vm).loc)
-            savings = estimated_savings[vm][1] / float(max_estimated_savings)
+            u_value = {}
+            for loc in locations:
+                if loc != current_loc:
 
-            self.utility["sla_penalty"].append(sla_penalty)
-            self.utility["migration_energy"].append(migration_energy)
-            self.utility["remaining_vm"].append(remaining_vm)
-            self.utility["dcloads"].append(dcload)
-            self.utility["cost_benefit"].append(savings)
+                    sla_penalty = sla_pen[vm][loc]
+                    migration_energy = ph.joul2kwh(mig_energy[vm][loc] / max_mig_energy[loc])
+                    remaining_vm = remaining_dur[vm] / float(max_rem)
+                    dcload = self.get_relative_dc_load(cloud_util, current_loc)
+                    savings = estimated_savings[vm][loc] / float(max_estimated_savings[loc])
 
-            result  =   self.w_sla       * sla_penalty       +  \
-                        self.w_energy    * migration_energy  +  \
-                        self.w_vm_rem    * remaining_vm      +  \
-                        self.w_dcload    * dcload            +  \
-                        self.w_cost      * savings
+                    result   =  conf.w_sla       * sla_penalty       +  \
+                                conf.w_energy    * migration_energy  +  \
+                                conf.w_vm_rem    * remaining_vm      +  \
+                                conf.w_dcload    * dcload            +  \
+                                conf.w_cost      * savings
 
-            self.utility["result"].append(result)
+                    u_value[loc] = result
 
-            u_result.append((vm, result))
+            max_u_value = max(u_value.items(), key=lambda x: x[1])
+            u_result.append((vm, max_u_value[0], max_u_value[1])) # add result tuple of (vm, location, max utility value)
 
-        u_result = sorted(u_result, key=lambda x: x[1], reverse=True)
+        u_result = sorted(u_result, key=lambda x: x[2], reverse=True)
 
         return u_result
 
@@ -540,11 +523,11 @@ class BCDScheduler(IScheduler):
 
         """
 
-        u_result = self.calculate_utility_function(t_next, forecast, ideal)        
+        u_result = self.calculate_utility_function(t_next, forecast, ideal)
         if len(u_result) == 0:
             return []
 
-        result = [ u_value[0] for u_value in u_result if u_value[1] > self.utility_threshold ]
+        result = [ u_item for u_item in u_result if u_item[2] > conf.utility_threshold ]
 
         return result
 
@@ -565,7 +548,7 @@ class BCDScheduler(IScheduler):
 
 
 
-    def find_host(self, vm, scenario, current_loc=None, weighted=False):
+    def assign_request(self, vm, scenario, current_loc=None, weighted=False):
         if scenario == 1:
             return self._find_random_host(vm, current_loc)
         elif scenario == 2: 
@@ -597,7 +580,7 @@ class BCDScheduler(IScheduler):
             #  - make sure the server's resources are now reserved
             # add new migration to the schedule
             if request.what == 'boot':
-                server = self.find_host(request.vm, self.scenario)
+                server = self.assign_request(request.vm, self.scenario)
                 if server is None:
                     error('not enough free resources for VM {}'.format(request.vm))
                     # self.cloud.get_current().vms.remove(request.vm)
@@ -614,46 +597,25 @@ class BCDScheduler(IScheduler):
                     # instead of t to add to actions (not rounded to hours)
                     self.schedule.add(action, t_req)
 
-
-        #############################################
-        # Another possibility: 
-        # just take current time stamp to place requests
-        # Taken from bfd scheduler
-        #############################################
-    
-        # VMs = []
-        # # get VMs that need to be placed
-        # #  - VMs from boot requests
-        # requests = self.environment.get_requests()
-        # for request in requests:
-        #     #import ipdb; ipdb.set_trace()
-        #     if request.what == 'boot':
-        #         VMs.append(request.vm)
-        # #  - select VMs on underutilised PMs
-        # VMs.extend(self._remove_vms_from_underutilised_hosts())
-
-        # VMs = sort_vms_decreasing(VMs)
-
-
         
         if t_next < self.environment.end:
 
-            # already chosen vms that should be migrated
-            migration_vms = self.vms_to_migrate(t_next, self.scenario)
-            # migration_vms = list(set(migration_vms) - set(vms_to_exclude))
-            for vm in migration_vms:
-                current_server = self.cloud.get_current().allocation(vm)
-                current_loc = current_server.loc
-                server = self.find_host(vm, self.scenario, current_loc=current_loc)
-                if server is None:
-                    error('No space to migrate VM {}'.format(vm))
-                else:
+            # vm items with maximum utility values that should be migrated
+            migration_vm_items = self.vms_to_migrate(t_next, self.scenario)
+            for vm_item in migration_vm_items:
+                vm = vm_item[0]
+                loc = vm_item[1]
+                server = self.find_host_for_vm(vm, loc)
+                if server is not None:
                     # Actually migrate the vm to a server at a cheaper location
+                    self.add_downtime(vm, server.loc)
                     action = Migration(vm, server)
                     self.cloud.apply(action)
                     # migrate at the end of this simulation timeframe
                     self.schedule.add(action, t_next)
         self.cloud.reset_to_real()
+
+
         return self.schedule
 
     def finalize(self):
