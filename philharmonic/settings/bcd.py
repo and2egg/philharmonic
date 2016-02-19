@@ -18,7 +18,7 @@ output_folder = os.path.join(base_output_folder, "bcd/")
 # 7) cost aware requests and migrations + ideal forecast (assign to cheapest DC based on ideal forecasts and job length)
 
 bcdconf = {
-	'scenario': 6
+	'scenario': 4
 }
 
 factory['scheduler'] = 'BCDScheduler'
@@ -30,13 +30,13 @@ factory['environment'] = 'SimpleSimulatedEnvironment'
 
 inputgen_settings['resource_distribution'] = 'uniform' # uniform or normal
 
-inputgen_settings['server_num'] = 20
+inputgen_settings['server_num'] = 10
 inputgen_settings['min_server_cpu'] = 4 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 8 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 100
+inputgen_settings['VM_num'] = 20
 inputgen_settings['min_cpu'] = 1 # 2,
 inputgen_settings['max_cpu'] = 2 # 4,
 inputgen_settings['min_ram'] = 0.5 # 4,
@@ -111,8 +111,19 @@ w_dcload = 0.2
 w_cost = 0.9
 
 # threshold for deciding on vm migration
+# the sum of all utility values except costs (w_cost) should be smaller
+# than this utility threshold, to make it impossible to reach this 
+# threshold without a positive value of the cost utility
 
-utility_threshold = 0.8
+utility_threshold = 1.5
+
+
+# to evaluate: 
+# simulation, inputgen 2016-02-18 200211
+# 
+# 2014-07-11 20:00 - normal u value (1.5)
+# 2014-07-17 10:00 - high u value (2.7)
+# 2014-07-18 21:00 - ultra high u value (4.4)
 
 
 
@@ -126,15 +137,20 @@ sla_values = [99.95,99.9,99]
 # if None they will be assigned by a resource distribution
 duration_values = [1,2,5,8,12,24,48]
 # indicates whether different dirty page rates should be assigned to vms
-generate_dpr = True
+generate_dpr = False
 # indicates whether different sla values should be assigned to vms
-generate_sla = True
+generate_sla = False
 # indicates whether fixed duration values (see above) should be used
 fixed_duration = True
 # indicates whether it is possible that vms run for the whole duration of the simulation
-total_duration = True
+total_duration = False
 # indicates whether the sla status of vms should be continuously updated in the simulator
 update_vm_sla = True
+# sets a threshold for price differences, only if the maximum absolute price differences 
+# are above the threshold will vms be chosen for migration for the current iteration
+min_price_threshold = 0.001
+# minimum remaining duration of vm in seconds to be considered for migration
+min_vm_remaining = 3600
 
 
 
@@ -187,6 +203,9 @@ if sim_type == "DA":
 
 elif sim_type == "RT":
 	bandwidth_map = bandwidth_rt
+
+
+bandwidth_map = {}
 
 
 power_freq_model = False

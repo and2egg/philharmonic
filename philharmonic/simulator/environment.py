@@ -184,6 +184,7 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
             self._t = self._times[0]
             self.start = self._times[0]
             self.end = self._times[-1]
+            self.locations = None # set in simulator
             if requests is not None:
                 self._requests = requests
             else:
@@ -193,6 +194,7 @@ class FBFSimpleSimulatedEnvironment(SimulatedEnvironment):
             self.vm_end = vm_end
             self.vm_duration = vm_duration
             self.vm_sla_ths = self._get_vm_sla_ths()
+            self.servers_per_loc = {}
 
         else:
             self._t = 0

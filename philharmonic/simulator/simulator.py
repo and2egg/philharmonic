@@ -157,6 +157,8 @@ class Simulator(IManager):
         elif self.factory['forecast_type'] == "real_forecast_map":
             self.environment.get_real_forecast_map(forecast_periods)
 
+        self.init_servers_per_loc()
+
         # TODO Andreas: check "real_forecasts" and "real_forecast_map" as well
         if conf.prices_in_mwh:
             self.environment.el_prices = self.environment.el_prices / 1000
@@ -194,6 +196,12 @@ class Simulator(IManager):
     def show_cloud_usage(self):
         self.cloud.show_usage()
         self.prompt()
+
+    def init_servers_per_loc(self):
+        locations = self.environment.locations
+        for location in locations:
+            servers = [ server for server in self.cloud.servers if server.loc == location ]
+            self.environment.servers_per_loc[location] = servers
 
     def run(self, steps=None):
         """Run the simulation. Iterate through the times, query for

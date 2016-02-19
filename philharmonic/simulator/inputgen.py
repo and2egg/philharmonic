@@ -379,7 +379,7 @@ def uniform_vmreqs(start, end, round_to_hour=True, **kwargs):
         sla_values = conf.sla_values
         slas = distribution_population_fixed(VM_num, distribution=resource_distribution, 
                                         values=sla_values)
-    import ipdb; ipdb.set_trace()
+        
     if conf.fixed_duration and conf.duration_values is not None:
         duration_values = conf.duration_values # fixed set of durations
         if conf.total_duration: # vms for the whole duration of the simulation

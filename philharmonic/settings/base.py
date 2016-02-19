@@ -106,6 +106,30 @@ bandwidth = 1000
 bandwidth_map = {}
 
 
+#################################
+#####   Utility function    #####
+#################################
+
+#### Defining CONSTANTS ####
+
+max_fc_horizon = 12
+
+# weights
+
+w_sla = 0.8
+w_energy = 0.1
+w_vm_rem = 0.4
+w_dcload = 0.2
+w_cost = 0.9
+
+# threshold for deciding on vm migration
+# the sum of all utility values except costs (w_cost) should be smaller
+# than this utility threshold, to make it impossible to reach this 
+# threshold without a positive value of the cost utility
+
+utility_threshold = 1.5
+
+
 ### simulation parameters ###
 
 # dirty page rates applied to vms
@@ -125,6 +149,12 @@ fixed_duration = False
 total_duration = False
 # indicates whether the sla status of vms should be continuously updated in the simulator
 update_vm_sla = False
+# sets a threshold for price differences, only if the maximum absolute price differences 
+# are above the threshold will vms be chosen for migration for the current iteration
+min_price_threshold = 0.001
+# minimum remaining duration of vm in seconds to be considered for migration
+min_vm_remaining = 3600
+
 
 
 from time import localtime
@@ -363,26 +393,6 @@ alternate_cost_model = False
 
 location_based = False
 
-
-#################################
-#####   Utility function    #####
-#################################
-
-#### Defining CONSTANTS ####
-
-max_fc_horizon = 12
-
-# weights
-
-w_sla = 0.4
-w_energy = 0.1
-w_vm_rem = 0.4
-w_dcload = 0.2
-w_cost = 0.9
-
-# threshold for deciding on vm migration
-
-utility_threshold = 0.8
 
 
 # Benchmark

@@ -66,7 +66,7 @@ E_mig_custom = lambda V_mig : alpha*V_mig + beta
 V_mig_custom = lambda V_mem, R, D, n : V_mem * (1-(D/float(R/8.))**(n+1))/(1-D/float(R/8.))
 # migration time, R assumed to be in Mbit/s
 T_mig_custom = lambda V_mig, R : V_mig/(R/8.)
-# migration time for the nth iteration, R assumed to be in Mbit/s, D in Mbyte/s
+# downtime of migration (migration time for the nth iteration), R assumed to be in Mbit/s, D in Mbyte/s
 T_n = lambda V_mem, R, D, n : V_mem * ((D/float(R/8.))**(n)) / float(R/8.)
 # vm resume time after migration
 T_resume = 0.05 # in seconds
@@ -122,14 +122,14 @@ def calculate_predicted_downtime(vm, loc, bandwidth_map={}):
         else:
             # get the estimated pre-copy iteration for reaching a defined threshold V_thd
             n = int(math.ceil(math.log(V_thd/float(memory),
-                                       vm.dpr/float(bandwidth))))
+                                       vm.dpr/float(bandwidth/8.))))
         if n > n_max:
             n = n_max
     except ZeroDivisionError:
         n = 1 # TODO: check what raises this error
     # calculate time of pre-copy iteration n
-    stop_time = T_n(memory, bandwidth, vm.dpr, n)
-    T_down = stop_time + T_resume
+    down_time = T_n(memory, bandwidth, vm.dpr, n)
+    T_down = down_time + T_resume
     return T_down
 
 def calculate_migration_energy(vm, loc, bandwidth_map={}):
@@ -152,7 +152,7 @@ def calculate_migration_energy(vm, loc, bandwidth_map={}):
         else:
             # get the estimated pre-copy iteration for reaching a defined threshold V_thd
             n = int(math.ceil(math.log(V_thd/float(memory),
-                                       vm.dpr/float(bandwidth))))
+                                       vm.dpr/float(bandwidth/8.))))
         if n > n_max:
             n = n_max
     except ZeroDivisionError:
