@@ -27,6 +27,7 @@ def generate_series_results(cloud, env, schedule, nplots):
     # cloud utilisation
     #------------------
     # evaluator.precreate_synth_power(env.start, env.end, cloud.servers)
+
     if conf.custom_weights is not None:
         util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, 
                                 weights=conf.custom_weights, locationBased=conf.location_based)
@@ -47,10 +48,26 @@ def generate_series_results(cloud, env, schedule, nplots):
     # ax.set_title('Utilisation (%)')
     # util.plot(ax=ax)
 
+    import ipdb;ipdb.set_trace()
+
+    if conf.location_based:
+        numservers_per_location = evaluator.calculate_numservers_per_location(cloud, env, schedule, 
+                                weights=conf.custom_weights)
+        info('Servers per location')
+        info(str(numservers_per_location))
+        numservers_sampled = numservers_per_location.resample(conf.power_freq, fill_method='pad')
+
+        power_per_location = ph.calculate_power_per_location(util, numservers_per_location)
+        info('Power per location')
+        info(str(power_per_location))
+
     # cloud power consumption
     #------------------
     # TODO: add frequency to this power calculation
-    power = evaluator.generate_cloud_power(util)
+    if conf.location_based:
+        power = evaluator.generate_cloud_power_per_location(util)
+    else:
+        power = evaluator.generate_cloud_power(util)
     if conf.save_power:
         power.to_pickle(output_loc('power.pkl'))
     ax = plt.subplot(nplots, 1, 3)
@@ -61,6 +78,10 @@ def generate_series_results(cloud, env, schedule, nplots):
     # info(energy)
     # info(' - total:')
     # info(energy.sum())
+
+    
+
+    ph.calculate_price_new(power, env.el_prices, transform_to_jouls=False)
 
     # cooling overhead
     #-----------------

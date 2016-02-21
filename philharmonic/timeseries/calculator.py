@@ -28,6 +28,25 @@ def calculate_power(util, P_idle=100, P_peak=200):
     P[P>0] += P_idle
     return P
 
+def calculate_power_per_location(util, numservers_per_location, P_idle=100, P_peak=200):
+    """Given a DataFrame of server utilisations, calculate power. This
+    model is often used, e.g. in:
+
+    Xu, H., Feng, C., and Li, B. (2013). Temperature aware workload management
+    in geo-distributed datacenters. In Proc. USENIX ICAC, 2013.
+
+    """
+    P = util * (P_peak - P_idle) # dynamic part
+    # a server with no load is suspended (otherwise idle power applies)
+    P[P>0] += numservers_per_location * P_idle
+
+##   0.5    1   0.8
+##   1      2   2 
+##   50    100  80
+##   50    0.5*100 + 0.5*100=100 => (0.5+0.5)*100
+
+    return P
+
 def calculate_power_freq(ut, f=2000, P_idle=100, P_base=150,
                          P_dif=15, f_base=1000):
     """Power model as combination of calculate_power and:
@@ -226,7 +245,7 @@ def calculate_price_old(power, price_file, start_date=None, old_parser=False):
     total_price = h * sum(power*experiment_prices)
     return total_price
 
-def calculate_price(power, prices, start_date=None, transform_to_jouls=True, prices_in_mwh=False):
+def calculate_price(power, prices, start_date=None, transform_to_jouls=True):
     """Take or parse from a file a series of electricity prices ($/kWh),
     realign it to start_date (if it's provided) and calculate the price of the
     energy consumption stored in a time series of power values power (W).
@@ -247,9 +266,6 @@ def calculate_price(power, prices, start_date=None, transform_to_jouls=True, pri
     # Now we say that our energy prices start on this date.
     if start_date: #TODO: fix for DataFrame
         prices = realign(prices, start_date)
-
-    if prices_in_mwh:
-        prices = prices / 1000
 
     if transform_to_jouls == True:
         prices = per_kwh2per_joul(prices) # convert into $/J
@@ -277,7 +293,7 @@ def calculate_price(power, prices, start_date=None, transform_to_jouls=True, pri
     #---
     return total_price
 
-def calculate_price_new(power, prices, start_date=None, transform_to_jouls=True, prices_in_mwh=False):
+def calculate_price_new(power, prices, start_date=None, transform_to_jouls=False, prices_in_mwh=False):
     """Take or parse from a file a series of electricity prices ($/kWh),
     realign it to start_date (if it's provided) and calculate the price of the
     energy consumption stored in a time series of power values power (W).
@@ -304,13 +320,6 @@ def calculate_price_new(power, prices, start_date=None, transform_to_jouls=True,
 
     if transform_to_jouls == True:
         prices = per_kwh2per_joul(prices) # convert into $/J
-
-    #TODO: replace this with resample() and pass integrate as a function
-    # power.resample(prices.index.freq, how=calculate_energy, closed='both')*prices
-    #---
-    #times = list(power.index)
-    # prices.resample('H', how='mean')
-    # prices = prices.resample('5min', fill_method='pad')
 
     # prices are given in $/kWh
     # if a price is given as 0.027054 $/kWh and a machine is fully running for one hour at 200W

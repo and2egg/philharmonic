@@ -87,6 +87,67 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
     df_util = pd.DataFrame(utilisations_list, times)
     return df_util
 
+def calculate_numservers_per_location(cloud, environment, schedule,
+                                start=None, end=None, weights=None):
+    """Calculate utilisations of all servers based on the given schedule.
+
+    @param start, end: if given, only this period will be counted,
+    cloud model starts from _real. If not, whole environment.start-end
+    counted and the first state is _initial.
+
+    """
+    if start is None:
+        start = environment.start
+        cloud.reset_to_initial() # TODO: timestamp states and be smarter
+    else:
+        cloud.reset_to_real()
+    if end is None:
+        end = environment.end
+
+    state = cloud.get_current()
+
+    servers_list = []
+
+    locations = environment.locations
+    server_dict = {}
+    for loc in locations:
+        servers = environment.servers_per_loc[loc]
+        utilised_servers = filter(lambda s : not state.server_free(s), servers)
+        server_dict[loc] = len(utilised_servers)
+
+    servers_list.append(server_dict)
+    times = [start]
+    for t in schedule.actions.index.unique():
+        if t == start: # start from scratch
+            servers_list = []
+            times = []
+        # TODO: precise indexing, not dict
+        if isinstance(schedule.actions[t], pd.Series):
+            
+            for action in schedule.actions[t].values:
+                cloud.apply(action)
+        else:
+            action = schedule.actions[t]
+            cloud.apply(action)
+        state = cloud.get_current()
+        
+        locations = environment.locations
+        server_dict = {}
+        for loc in locations:
+            servers = environment.servers_per_loc[loc]
+            utilised_servers = filter(lambda s : not state.server_free(s), servers)
+            server_dict[loc] = len(utilised_servers)
+        
+        servers_list.append(server_dict)
+        times.append(t)
+    # times are non-sampled (have gaps), only times where actions occurred are stored
+    if times[-1] < end:
+        # the last utilisation values hold until the end - duplicate last
+        times.append(end)
+        servers_list.append(servers_list[-1])
+    df_servers = pd.DataFrame(servers_list, times)
+    return df_servers
+
 
 def precreate_synth_power(start, end, servers):
     # P_peak = conf.P_peak
@@ -131,6 +192,11 @@ def generate_cloud_power(util, start=None, end=None,
     if conf.power_randomize:
         power[power > 0] += conf.P_std * np.random.randn(*power.shape)
     return power
+
+def generate_cloud_power_per_location(util, start=None, end=None,
+                         power_freq_model=None, freq=None):
+    pass
+    
 
 def calculate_cloud_cost(power, el_prices, locationBased=False):
     """Take power and el. prices DataFrames & calc. the el. cost."""

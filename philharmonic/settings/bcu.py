@@ -2,14 +2,26 @@ from .base import *
 from philharmonic.logger import *
 from philharmonic import conf
 
-output_folder = os.path.join(base_output_folder, "bcd/")
+output_folder = os.path.join(base_output_folder, "bcu/")
 
 
 
 # scheduler configuration
 
 # scenarios: 
-# 1) Balanced Scheduler: No forecast, no migrations. not cost aware (assignments based on load, no migrations)
+# 1) Best fit decreasing Scheduler: non cost aware request scheduling (assignments based on load)
+# 2) Best cost fit Scheduler: cost aware request scheduling (assign to currently cheapest DC)
+# 3) Best cost fit Scheduler: cost aware request scheduling + forecast (assign to cheapest DC based on forecasts and job length)
+# 4) Best cost fit Scheduler: cost aware request scheduling + ideal forecast (assign to cheapest DC based on ideal forecasts and job length)
+# 5) Best cost utility scheduler: No Forecast, migrations. Evaluate utility function for migrations without forecasts
+# 6) Best cost utility scheduler: Forecast, migrations. Evaluate utility function for migrations including forecasts
+# 7) Best cost utility scheduler: Ideal Forecast, migrations. Evaluate utility function for migrations including ideal forecasts
+
+
+
+
+# scenarios: 
+# 1) Balanced fit Scheduler: No forecast, no migrations. not cost aware (assignments based on load, no migrations)
 # 2) Best cost fit Scheduler: No forecast, no migrations. cost aware request scheduling (assign to currently cheapest DC)
 # 3) Best cost utility scheduler: No forecast, no migrations. Evaluate utility function for the current time stamp
 # 4) Best cost utility scheduler: Forecast, no migrations. Evaluate utility function including forecasts
@@ -17,6 +29,7 @@ output_folder = os.path.join(base_output_folder, "bcd/")
 # 6) Best cost utility scheduler: No Forecast, migrations. Evaluate utility function for assignments and migrations without forecasts
 # 7) Best cost utility scheduler: Forecast, migrations. Evaluate utility function for assignments and migrations including forecasts
 # 8) Best cost utility scheduler: Ideal Forecast, migrations. Evaluate utility function for assignments and migrations including ideal forecasts
+
 
 
 # possible scenarios: 
@@ -28,26 +41,26 @@ output_folder = os.path.join(base_output_folder, "bcd/")
 # 6) cost aware requests and migrations + forecast (assign to cheapest DC based on forecasts and job length)
 # 7) cost aware requests and migrations + ideal forecast (assign to cheapest DC based on ideal forecasts and job length)
 
-bcdconf = {
-	'scenario': 6
+bcuconf = {
+	'scenario': 7
 }
 
-factory['scheduler'] = 'BCDScheduler'
-factory['scheduler_conf'] = bcdconf
-factory['environment'] = 'SimpleSimulatedEnvironment'
+factory['scheduler'] = 'BCUScheduler'
+factory['scheduler_conf'] = bcuconf
+factory['environment'] = 'BCUSimulatedEnvironment'
 
 
 # Input gen settings
 
 inputgen_settings['resource_distribution'] = 'uniform' # uniform or normal
 
-inputgen_settings['server_num'] = 10
+inputgen_settings['server_num'] = 100
 inputgen_settings['min_server_cpu'] = 4 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 8 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 20
+inputgen_settings['VM_num'] = 200
 inputgen_settings['min_cpu'] = 1 # 2,
 inputgen_settings['max_cpu'] = 2 # 4,
 inputgen_settings['min_ram'] = 0.5 # 4,
@@ -73,34 +86,6 @@ inputgen_settings['cloud_infrastructure'] = 'uniform_infrastructure' # uniform_i
 inputgen_settings['VM_request_generation_method'] = 'uniform_vmreqs' # uniformly generate vm requests
 inputgen_settings['round_to_hour'] = True
 inputgen_settings['show_beta_value'] = False
-
-
-
-#### General Settings ####
-
-# DATA_LOC_SIM_DA: DA input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
-# DATA_LOC_SIM_RT: RT input from USA (ISO-NE, PJM)
-
-sim_type = "DA" # DA or RT
-
-if sim_type == "DA":
-	DATA_LOC = DATA_LOC_SIM_DA
-
-	el_price_dataset = os.path.join(DATA_LOC, 'prices_da_all.csv')
-	el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc_all.csv')
-
-elif sim_type == "RT":
-	DATA_LOC = DATA_LOC_SIM_RT
-
-	el_price_dataset = os.path.join(DATA_LOC, 'prices_rt_all.csv')
-	el_price_forecast = os.path.join(DATA_LOC, 'prices_rt_fc_all.csv')
-
-add_date_to_folders = True
-
-dynamic_locations = True
-
-prompt_configuration = True
-
 
 
 
@@ -207,6 +192,28 @@ bandwidth_rt = {
 	}
 }
 
+
+
+#### General Settings ####
+
+# DATA_LOC_SIM_DA: DA input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
+# DATA_LOC_SIM_RT: RT input from USA (ISO-NE, PJM)
+
+sim_type = "DA" # DA or RT
+
+if sim_type == "DA":
+	DATA_LOC = DATA_LOC_SIM_DA
+
+	el_price_dataset = os.path.join(DATA_LOC, 'prices_da_Jun_July_2013.csv')
+	el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc_Jun_July_2013.csv')
+
+elif sim_type == "RT":
+	DATA_LOC = DATA_LOC_SIM_RT
+
+	el_price_dataset = os.path.join(DATA_LOC, 'prices_rt_Jun_July_2013.csv')
+	el_price_forecast = os.path.join(DATA_LOC, 'prices_rt_fc_Jun_July_2013.csv')
+
+
 # if empty, bandwidth will be assigned a fixed value
 bandwidth_map = {}
 if sim_type == "DA":
@@ -215,8 +222,14 @@ if sim_type == "DA":
 elif sim_type == "RT":
 	bandwidth_map = bandwidth_rt
 
-
 bandwidth_map = {}
+
+
+add_date_to_folders = True
+
+dynamic_locations = True
+
+prompt_configuration = True
 
 
 power_freq_model = False
@@ -228,6 +241,12 @@ transform_to_jouls = False
 prices_in_mwh = True
 alternate_cost_model = True
 location_based = True
+
+# the frequency at which to generate the power signals
+power_freq = 'H' # '5min'
+# various power values of the servers in Watt hours
+P_peak = 200
+P_idle = 100
 
 # show_cloud_interval = pd.offsets.Hour(12) # interval at which simulation output should be done
 
@@ -266,12 +285,17 @@ else:
 
 
 # TODO Andreas: Make this setting dynamic!
+
+# probable possibility: 
+# start = prices.index[0]
+# end= prices.index[-1]
+
 # the time period of the simulation
-start = pd.Timestamp('2014-07-07 00:00')
+start = pd.Timestamp('2013-06-20 00:00')
 
 # TODO Andreas: Make this setting dynamic, or define as property in each settings file
-times = pd.date_range(start, periods=24 * 28, freq='H')
+times = pd.date_range(start, periods=24 * 14, freq='H') # * 38
 end = times[-1]
 
-custom_weights = {'RAM': 0.5, '#CPUs': 0.5}
+custom_weights = {'RAM': 0.3, '#CPUs': 0.7}
 # custom_weights = None

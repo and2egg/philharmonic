@@ -3,6 +3,7 @@ from .peak_pauser.energy_predictor import EnergyPredictor
 from .ischeduler import NoScheduler
 from .fbf_scheduler import FBFScheduler
 from .bcd_scheduler import BCDScheduler
+from .bcu_scheduler import BCUScheduler
 from .bcf_scheduler import BCFScheduler
 from .bcf_notemp_scheduler import BCFNoTempScheduler
 from .bcffs_scheduler import BCFFSScheduler

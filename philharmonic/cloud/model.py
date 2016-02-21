@@ -121,15 +121,6 @@ class VM(Machine):
             pass
         return s
 
-    # def get_dirty_page_rate(self):
-    #     return self._dpr
-
-    # def set_dirty_page_rate(self, dirty_page_rate):
-    #     self._dpr = dirty_page_rate
-
-    # dpr = property(get_dirty_page_rate, set_dirty_page_rate, doc="dirty page rate of vm")
-
-
     # calling (un)pause or migrate on a VM gets routed to the cloud
     # and then to the current state
 

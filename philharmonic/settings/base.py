@@ -152,8 +152,8 @@ update_vm_sla = False
 # sets a threshold for price differences, only if the maximum absolute price differences 
 # are above the threshold will vms be chosen for migration for the current iteration
 min_price_threshold = 0.001
-# minimum remaining duration of vm in seconds to be considered for migration
-min_vm_remaining = 3600
+# minimum remaining duration of vm in simulation timesteps to be considered for migration
+min_vm_remaining = 1
 
 
 
