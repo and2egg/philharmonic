@@ -224,6 +224,8 @@ elif sim_type == "RT":
 
 bandwidth_map = {}
 
+bandwidth_costs = 0.01 # $ / GB
+
 
 add_date_to_folders = True
 
@@ -241,6 +243,7 @@ transform_to_jouls = False
 prices_in_mwh = True
 alternate_cost_model = True
 location_based = True
+custom_migration_overhead = True
 
 # the frequency at which to generate the power signals
 power_freq = 'H' # '5min'

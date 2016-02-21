@@ -105,6 +105,8 @@ bandwidth = 1000
 # if empty, bandwidth will be assigned a fixed value
 bandwidth_map = {}
 
+bandwidth_costs = 0.01 # $ / GB
+
 
 #################################
 #####   Utility function    #####
@@ -390,6 +392,8 @@ transform_to_jouls = True
 prices_in_mwh = False
 
 alternate_cost_model = False
+
+custom_migration_overhead = False
 
 location_based = False
 

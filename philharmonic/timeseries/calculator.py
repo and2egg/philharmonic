@@ -40,10 +40,13 @@ def calculate_power_per_location(util, numservers_per_location, P_idle=100, P_pe
     # a server with no load is suspended (otherwise idle power applies)
     P[P>0] += numservers_per_location * P_idle
 
-##   0.5    1   0.8
-##   1      2   2 
-##   50    100  80
-##   50    0.5*100 + 0.5*100=100 => (0.5+0.5)*100
+    ## example
+    ## 
+    ##              loc1  loc2  loc3
+    ## util         0.5   1   0.8
+    ## numservers   1      2   2 
+    ##  util(%)     50    100  80
+    ##              50    (x)          (x) : 0.5*100 + 0.5*100=100 => (0.5+0.5)*100 (for each server separately)
 
     return P
 
@@ -152,8 +155,29 @@ def calculate_predicted_downtime(vm, loc, bandwidth_map={}):
     return T_down
 
 def calculate_migration_energy(vm, loc, bandwidth_map={}):
-    """utility criteria
+    """
     Calculate the migration energy (in Joules) for this VM
+    based on the current memory consumption, 
+    dirty page rate and bandwidth from the location
+    it should be migrated to
+    """
+    migration_data = calculate_migration_load(vm, loc, bandwidth_map)
+    energy = E_mig_custom(migration_data)
+    return energy
+
+def calculate_migration_energy_by_load(migration_data):
+    """
+    Calculate the migration energy (in Joules) for this VM
+    based on the current memory consumption, 
+    dirty page rate and bandwidth from the location
+    it should be migrated to
+    """
+    energy = E_mig_custom(migration_data)
+    return energy
+
+def calculate_migration_load(vm, loc, bandwidth_map={}):
+    """
+    Calculate the migration load (in MB) for this VM
     based on the current memory consumption, 
     dirty page rate and bandwidth from the location
     it should be migrated to
@@ -181,8 +205,7 @@ def calculate_migration_energy(vm, loc, bandwidth_map={}):
         migration_data = memory*n_max
     else:
         migration_data = V_mig_custom(memory, bandwidth, vm.dpr, n)
-    energy = E_mig_custom(migration_data)
-    return energy
+    return migration_data
 
 
 def calculate_util(active_cores, util_active_cores):
@@ -293,10 +316,10 @@ def calculate_price(power, prices, start_date=None, transform_to_jouls=True):
     #---
     return total_price
 
-def calculate_price_new(power, prices, start_date=None, transform_to_jouls=False, prices_in_mwh=False):
+def calculate_price_new(power, prices, start_date=None, transform_to_jouls=False, power_in_kw=True, prices_in_mwh=False):
     """Take or parse from a file a series of electricity prices ($/kWh),
     realign it to start_date (if it's provided) and calculate the price of the
-    energy consumption stored in a time series of power values power (W).
+    energy consumption stored in a time series of power values power (W or kW).
     Should work for DataFrames too.
 
     @param power: pandas.TimeSeries of power values
@@ -326,17 +349,15 @@ def calculate_price_new(power, prices, start_date=None, transform_to_jouls=False
     # it produces 200Wh for this period and the resulting price is 0.541 cent for one hour
     # if it runs for a whole day at the same price it would result in 12.44 cent for 23 hours
     prices = prices.reindex(power.index, method='ffill')
-
-    # we don't really know when the last interval ended, so we'll make a guess
     times = power.index
-
     # interval between two timestamps
     interval = times[1] - times[0]
     # intervals per hour, e.g. 12 intervals for 5 minute intervals
     intervals_per_hour = 3600 / float(interval.seconds)
 
     # transform the Watts into kiloWatts (kW)
-    power = power / 1000
+    if not power_in_kw:
+        power = power / 1000
     # the given power value in kW is not applied to a full hour
     # but to a different time interval, e.g. 5 minutes
     # thus, if the machine runs on 150W then it needs in 5 minutes 150Wh / 12 = 12.5Wh = 0.0125kWh

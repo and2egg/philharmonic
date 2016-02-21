@@ -276,8 +276,6 @@ class BCUScheduler(IScheduler):
                 for h in range(1, max_fc+1):
                     avg = self._calculate_avg_price(prices[loc][t], fc_prices[loc], t+period, t+period*(h), weighted=weighted)
                     fc_list.append((h, loc, avg))
-                if len(fc_list) == 0:
-                    import ipdb; ipdb.set_trace()
                 min_price = min(fc_list, key=lambda x: x[2])
                 cheapest_loc.append(min_price)
             return sorted(cheapest_loc, key=lambda x: x[2])
@@ -547,8 +545,8 @@ class BCUScheduler(IScheduler):
             cost_benefit[vm]    = {}
 
             for loc in locations:
-                if loc != current_loc:
-                    # preparing sla penalty criteria
+                if loc != current_loc: 
+                   # preparing sla penalty criteria
                     sla_penalty[vm][loc] = self._get_probability_of_sla_penalty(vm, loc)
 
                     # preparing migration energy criteria

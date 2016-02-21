@@ -87,13 +87,70 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
     df_util = pd.DataFrame(utilisations_list, times)
     return df_util
 
+def precreate_synth_power(start, end, servers):
+    # P_peak = conf.P_peak
+    # P_idle = conf.P_idle
+    # globals()['P_idle'] = P_idle
+    # P_delta = P_peak - P_idle
+    # power_freq = conf.power_freq
+
+    # index = pd.date_range(start, end, freq=power_freq)
+    # P_synth_flat = pd.DataFrame({s: P_delta for s in servers}, index)
+    # globals()['P_synth_flat'] = P_synth_flat
+
+    full_util = {server : [1.0, 1.0] for server in servers}
+    full_util = pd.DataFrame(full_util,
+                             index=[start, end])
+    full_util = full_util.resample('H', fill_method='pad')
+    globals()['full_util'] = full_util
+
+    globals()['cached_end'] = None
+
+# TODO: get rid of this globals nonsense and create a Class (or a generator)
+def generate_cloud_power(util, start=None, end=None,
+                         power_freq_model=None, freq=None):
+    """Create power signals from varying utilisation rates."""
+    if power_freq_model is None:
+        power_freq_model = conf.power_freq_model
+    if freq is None:
+        freq = 2000
+    # calculate on a sparse util DataFrame
+    if power_freq_model:
+        #TODO: get frequencies from the servers
+        power = ph.calculate_power_freq(
+            util, f=freq, P_idle=conf.P_idle, P_base=conf.P_base,
+            P_dif=conf.P_dif, f_base=conf.f_base
+        )
+    else:
+        power = ph.calculate_power(util, conf.P_idle, conf.P_peak)
+
+    # fill it out to the full frequency
+    power = power.resample(conf.power_freq, fill_method='pad')
+    # add random noise
+    if conf.power_randomize:
+        power[power > 0] += conf.P_std * np.random.randn(*power.shape)
+    return power
+
+def generate_cloud_power_per_location(util, cloud, env, schedule):
+    """generate total cloud power per location in kW
+    @author Andreas Egger"""
+    numservers_per_location = calculate_numservers_per_location(cloud, env, schedule)
+
+    power_per_location = ph.calculate_power_per_location(util, numservers_per_location)
+    power_per_location = power_per_location.resample(conf.power_freq, fill_method='pad')
+    power_per_location = power_per_location / 1000
+    
+    return power_per_location
+
+
 def calculate_numservers_per_location(cloud, environment, schedule,
-                                start=None, end=None, weights=None):
+                                start=None, end=None):
     """Calculate utilisations of all servers based on the given schedule.
 
     @param start, end: if given, only this period will be counted,
     cloud model starts from _real. If not, whole environment.start-end
     counted and the first state is _initial.
+    @author Andreas Egger
 
     """
     if start is None:
@@ -147,55 +204,6 @@ def calculate_numservers_per_location(cloud, environment, schedule,
         servers_list.append(servers_list[-1])
     df_servers = pd.DataFrame(servers_list, times)
     return df_servers
-
-
-def precreate_synth_power(start, end, servers):
-    # P_peak = conf.P_peak
-    # P_idle = conf.P_idle
-    # globals()['P_idle'] = P_idle
-    # P_delta = P_peak - P_idle
-    # power_freq = conf.power_freq
-
-    # index = pd.date_range(start, end, freq=power_freq)
-    # P_synth_flat = pd.DataFrame({s: P_delta for s in servers}, index)
-    # globals()['P_synth_flat'] = P_synth_flat
-
-    full_util = {server : [1.0, 1.0] for server in servers}
-    full_util = pd.DataFrame(full_util,
-                             index=[start, end])
-    full_util = full_util.resample('H', fill_method='pad')
-    globals()['full_util'] = full_util
-
-    globals()['cached_end'] = None
-
-# TODO: get rid of this globals nonsense and create a Class (or a generator)
-def generate_cloud_power(util, start=None, end=None,
-                         power_freq_model=None, freq=None):
-    """Create power signals from varying utilisation rates."""
-    if power_freq_model is None:
-        power_freq_model = conf.power_freq_model
-    if freq is None:
-        freq = 2000
-    # calculate on a sparse util DataFrame
-    if power_freq_model:
-        #TODO: get frequencies from the servers
-        power = ph.calculate_power_freq(
-            util, f=freq, P_idle=conf.P_idle, P_base=conf.P_base,
-            P_dif=conf.P_dif, f_base=conf.f_base
-        )
-    else:
-        power = ph.calculate_power(util, conf.P_idle, conf.P_peak)
-
-    # fill it out to the full frequency
-    power = power.resample(conf.power_freq, fill_method='pad')
-    # add random noise
-    if conf.power_randomize:
-        power[power > 0] += conf.P_std * np.random.randn(*power.shape)
-    return power
-
-def generate_cloud_power_per_location(util, start=None, end=None,
-                         power_freq_model=None, freq=None):
-    pass
     
 
 def calculate_cloud_cost(power, el_prices, locationBased=False):
@@ -509,6 +517,66 @@ def calculate_migration_overhead(cloud, environment, schedule,
                 energy = ph.joul2kwh(energy) # kWh
                 total_energy += energy
                 cost = energy * mean_el_price
+                total_cost += cost
+    return total_energy, total_cost
+
+
+def calculate_custom_migration_overhead(cloud, environment, schedule,
+                                 start=None, end=None, bandwidth_map={}):
+    """For every migration, calculate the energy using the  Liu et al. model,
+    take the mean electricity price between the current and target locations,
+    and calculate the resulting cost.
+
+    Additionally include bandwidth costs at 1$/GB. The migration load is 
+    calculated and bandwidth costs are derived from it. 
+
+    @param start, end: if given, only this period will be counted,
+    cloud model starts from _real. If not, whole environment.start-end
+    counted and the first state is _initial.
+
+    @returns: energy in kWh, cost in $
+
+    """
+    if start is None:
+        start = environment.start
+        cloud.reset_to_initial() # TODO: timestamp states and be smarter
+    else:
+        cloud.reset_to_real()
+    if end is None:
+        end = environment.end
+
+    total_energy = 0.
+    total_cost = 0.
+    for t in schedule.actions[start:end].index.unique():
+        # TODO: precise indexing, not dict
+        if isinstance(schedule.actions[t], pd.Series):
+            actions = [action for action in schedule.actions[t].values]
+        else:
+            actions = [schedule.actions[t]]
+        for action in actions:
+            if action.name not in set(['boot', 'delete', 'migrate']):
+                continue # we're not interested in other actions
+            vm = action.vm
+            before = cloud.get_current()
+            host_before = before.allocation(action.vm)
+            cloud.apply(action)
+            after = cloud.get_current()
+            host_after = after.allocation(action.vm)
+
+            t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour+1)
+            #if host_before or host_after is None, it's a boot/delete
+            if (action.name == 'migrate' and host_before and
+                host_after and host_before != host_after):
+                price_before = environment.el_prices[host_before.loc][t]
+                price_after = environment.el_prices[host_after.loc][t]
+                mean_el_price = (price_before + price_after) / 2.
+
+                migration_load = ph.calculate_migration_load(vm, host_after.loc, bandwidth_map)
+                energy = ph.calculate_migration_energy_by_load(migration_load)
+                energy = ph.joul2kwh(energy) # kWh
+                total_energy += energy
+                cost = energy * mean_el_price
+                cost += (migration_load / 1000) * conf.bandwidth_costs
                 total_cost += cost
     return total_energy, total_cost
 

@@ -48,25 +48,26 @@ def generate_series_results(cloud, env, schedule, nplots):
     # ax.set_title('Utilisation (%)')
     # util.plot(ax=ax)
 
-    import ipdb;ipdb.set_trace()
-
-    if conf.location_based:
-        numservers_per_location = evaluator.calculate_numservers_per_location(cloud, env, schedule, 
-                                weights=conf.custom_weights)
-        info('Servers per location')
-        info(str(numservers_per_location))
-        numservers_sampled = numservers_per_location.resample(conf.power_freq, fill_method='pad')
-
-        power_per_location = ph.calculate_power_per_location(util, numservers_per_location)
-        info('Power per location')
-        info(str(power_per_location))
+    # example: running 100 servers for 14 days at full power (200W)
+    #   equals max_power = 0.2kW * 100 * 24 * 14 = 6720 kW = 6.72 MW
+    #   for the simulation with 200 vms the total power draw is 70.4 kW
+    #    (according to parts of utilisation of max_power)
+    #   real power draw from simulation: (power / 1000).sum().sum() = 64.27 kW
+    #   utilisation is averaged over all locations: 
+    #           util_per_loc = util.sum() / len(util)
+    #           total_util = util_per_loc.sum() / len(util_per_loc)
+    #   energy costs: assuming an average price of 0.03 $/kWh the costs for this 
+    #           simulation are about 2 $
+    #           results from real simulation with 100 servers: 1.84 $
+    #   exact simulation reference: bcu/2016-02-21/172949_*
 
     # cloud power consumption
-    #------------------
-    # TODO: add frequency to this power calculation
+    #------------------    
     if conf.location_based:
-        power = evaluator.generate_cloud_power_per_location(util)
+        power = evaluator.generate_cloud_power_per_location(util, cloud, env, schedule)
+        costs = ph.calculate_price_new(power, env.el_prices, transform_to_jouls=False)
     else:
+        # TODO: add frequency to this power calculation
         power = evaluator.generate_cloud_power(util)
     if conf.save_power:
         power.to_pickle(output_loc('power.pkl'))
@@ -78,10 +79,7 @@ def generate_series_results(cloud, env, schedule, nplots):
     # info(energy)
     # info(' - total:')
     # info(energy.sum())
-
     
-
-    ph.calculate_price_new(power, env.el_prices, transform_to_jouls=False)
 
     # cooling overhead
     #-----------------
@@ -161,6 +159,58 @@ def serialise_results(cloud, env, schedule):
                                                  env.temperature,
                                                  locationBased=conf.location_based)
 
+
+    if conf.location_based:
+        # calculate utilisation
+        if conf.custom_weights is not None:
+            util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, 
+                                    weights=conf.custom_weights, locationBased=conf.location_based)
+        else:
+            util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, locationBased=conf.location_based)
+
+        # calculate cloud power and costs
+        cloud_power = evaluator.generate_cloud_power_per_location(util, cloud, env, schedule)
+        # cloud costs per location
+        cloud_costs = ph.calculate_price_new(cloud_power, env.el_prices, transform_to_jouls=False)
+
+        total_cloud_power = cloud_power.sum().sum() # in kW
+        total_cloud_costs = cloud_costs.sum() # in $
+
+        if conf.custom_migration_overhead:
+            migration_energy, migration_cost = evaluator.calculate_custom_migration_overhead(
+                cloud, env, schedule, bandwidth_map=conf.bandwidth_map
+            )
+        else:
+            migration_energy, migration_cost = evaluator.calculate_migration_overhead(
+                cloud, env, schedule
+            )
+
+        # Aggregated results
+        #===================
+        info('\nAggregated results\n------------------')
+        info(' - cloud power (kW)')
+        info(total_cloud_power)
+        info(' - cloud cost ($)')
+        info(total_cloud_costs)
+        info('Migration energy (kWh)')
+        info(migration_energy)
+        info('Migration cost ($)')
+        info(migration_cost)
+        info(' - cloud power with migrations:')
+        info(total_cloud_power + migration_energy)
+        info(' - cloud cost with migrations:')
+        info(total_cloud_costs + migration_cost)
+
+        if conf.liveplot:
+            plt.show()
+        elif conf.fileplot:
+            plt.savefig(output_loc('results-graph.pdf'))
+
+        info('\nDone. Results saved to: {}'.format(conf.output_folder))
+        
+        return []
+
+
     # Aggregated results
     #===================
     info('\nAggregated results\n------------------')
@@ -178,6 +228,7 @@ def serialise_results(cloud, env, schedule):
     info(energy_total + migration_energy)
     info('\nMigration cost ($)')
     info(migration_cost)
+
 
     # electricity costs
     #------------------
