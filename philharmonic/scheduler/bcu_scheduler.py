@@ -29,6 +29,16 @@ class BCUScheduler(IScheduler):
         IScheduler.__init__(self, cloud, driver)
 
 
+    def set_scenario(self, scenario):
+        self.scenario = scenario
+        
+
+    def reset(self):
+        blocked_vms = {}
+        blocked_vms_horizons = {}
+        price_difference_map = {}
+
+
     def sort_vms_decreasing(self, VMs):
         return sorted(VMs, key=lambda x : (x.res['#CPUs'], x.res['RAM']),
                       reverse=True)

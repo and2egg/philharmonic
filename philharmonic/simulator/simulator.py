@@ -37,6 +37,7 @@ import philharmonic as ph
 from philharmonic.logger import *
 import inputgen
 from .results import serialise_results
+from .results import serialise_results_batch
 from .results import serialise_results_tests
 from philharmonic import Schedule
 from philharmonic.scheduler.generic.fbf_optimiser import FBFOptimiser
@@ -260,6 +261,79 @@ class Simulator(IManager):
                 self.show_cloud_usage()
         return self.cloud, self.environment, self.real_schedule
 
+
+    def run_batch(self, steps=None, scenarios=[1]):
+        """Run the simulation in "batch" mode, meaning that all scenarios 
+        given as array will be evaluated. Iterate through the times, query for
+        geotemporal inputs, reevaluate the schedule and simulate actions.
+
+        @param steps: number of time steps to make through the input data
+        (if None, go through the whole input)
+
+        """
+
+        simulation_parameters = {}
+
+        for scenario in scenarios:
+
+
+            self.__init__()
+            self.scheduler.set_scenario(scenario)
+
+            if conf.show_cloud_interval is not None:
+                t_show = conf.start + conf.show_cloud_interval
+            self.scheduler.initialize()
+            passed_steps = 0
+            for t in self.environment.itertimes(): # iterate through all the times
+                passed_steps += 1
+                if steps is not None and passed_steps > steps:
+                    break
+                # get requests & update model
+                # these are the event triggers
+                # - we find any requests that might arise in this interval
+                if 'clean_requests' not in self.factory:
+                    self.factory['clean_requests'] = True
+                requests = self.environment.get_requests(clean=self.factory['clean_requests'])
+                # requests = self.environment.get_request_type('boot')
+
+                # check if schedule is already defined
+                # then apply previously planned actions
+                if 'schedule' in locals():
+                    actions = schedule.filter_current_actions(t, period)
+                    if len(actions) > 0:
+                        debug('Applying Planned Actions:\n{}\n'.format(actions))
+                        self.apply_actions(actions)
+
+                # - apply requests on the simulated cloud
+                self.apply_actions(requests)
+                # call scheduler to decide on actions
+                schedule = self.scheduler.reevaluate()
+                self.cloud.reset_to_real()
+
+                period = self.environment.get_period()
+                actions = schedule.filter_current_actions(t, period)
+                if len(requests) > 0:
+                    debug('Requests:\n{}\n'.format(requests))
+                if len(actions) > 0:
+                    debug('Applying:\n{}\n'.format(actions))
+                planned_actions = schedule.filter_current_actions(t + period)
+                if len(planned_actions) > 0:
+                    debug('Planned:\n{}\n'.format(planned_actions))
+                self.apply_actions(actions)
+                if conf.update_vm_sla == True:
+                    self.update_vm_states()
+                # import ipdb; ipdb.set_trace()
+                if conf.show_cloud_interval is not None and t == t_show:
+                    t_show = t_show + conf.show_cloud_interval
+                    self.show_cloud_usage()
+
+            info("RUN FINISHED FOR SCENARIO "+str(scenario))
+
+            simulation_parameters[scenario] = [ self.cloud, self.environment, self.real_schedule ]
+
+        return simulation_parameters
+
+
 # TODO: these other simulator subclasses should not be necessary
 class PeakPauserSimulator(Simulator):
     def __init__(self, factory=None):
@@ -385,6 +459,34 @@ def run(steps=None, custom_scheduler=None):
     # serialise and log the results
     #------------------------------
     results = serialise_results(cloud, env, schedule)
+
+    end_time = datetime.now()
+    info('Simulation finished at time: {}'.format(end_time))
+    info('Duration: {}\n'.format(end_time - start_time))
+    return results
+
+
+def run_batch(steps=None, custom_scheduler=None):
+    """Run the simulation."""
+    info('\nSETTINGS\n########\n')
+
+    # create simulator from the conf
+    #-------------------------------
+    simulator = Simulator(conf.get_factory(), custom_scheduler)
+
+    before_start(simulator)
+
+    # run the simulation
+    #-------------------
+    info('\nSIMULATION\n##########\n')
+    start_time = datetime.now()
+    info('Simulation started at time: {}'.format(start_time))
+    simulation_parameters = simulator.run_batch(steps, [1,2])
+    info('RESULTS\n#######\n')
+
+    # serialise and log the results
+    #------------------------------
+    results = serialise_results_batch(simulation_parameters)
 
     end_time = datetime.now()
     info('Simulation finished at time: {}'.format(end_time))

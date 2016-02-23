@@ -22,6 +22,18 @@ def load_settings_run(conf, scheduler):
     from philharmonic.simulator.simulator import run
     run(custom_scheduler=scheduler)
 
+# run simulator in "batch" mode, i.e. run multiple simulations at once
+
+@cli.command('runbatch')
+@click.option('--conf', default='philharmonic.settings.base',
+              help='The main conf module to load.')
+@click.option('--scheduler', '-s', default=None,
+              help='The scheduler class to use.')
+def load_settings_runbatch(conf, scheduler):
+    philharmonic._setup(conf)
+    from philharmonic.simulator.simulator import run_batch
+    run_batch(custom_scheduler=scheduler)
+
 # TODO: see if the --conf option can be a part of the cli group
 
 @cli.command('inputgen')

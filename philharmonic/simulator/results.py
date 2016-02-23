@@ -124,8 +124,7 @@ def generate_series_results(cloud, env, schedule, nplots):
 def serialise_results(cloud, env, schedule):
 
     if conf.location_based:
-        get_results_per_location(cloud, env, schedule)
-        return []
+        return get_results_per_location(cloud, env, schedule)
 
 
     fig = plt.figure(1)#, figsize=(10, 15))
@@ -297,7 +296,49 @@ def serialise_results(cloud, env, schedule):
     return aggregated_results
 
 
+def serialise_results_batch(simulation_parameters):
+
+    info("serialise_results_batch\n-----------------")
+
+    power_vs_costs = {}
+
+    for sim_param in simulation_parameters.items():
+
+        scenario = sim_param[0]
+        [ cloud, env, schedule ] = sim_param[1]
+
+        info("====================\n\n")
+        info("scenario: "+str(scenario))
+
+
+        [ total_power, total_costs ] = get_results_per_location(cloud, env, schedule)
+
+        power_vs_costs[scenario] = [ total_power, total_costs ]
+
+
+    max_power = max(power_vs_costs.items(), key=lambda x: x[1][0])[1][0]
+    max_cost = max(power_vs_costs.items(), key=lambda x: x[1][1])[1][1]
+
+    power_values = [ item[1][0] for item in power_vs_costs.items() ]
+    cost_values = [ item[1][1] for item in power_vs_costs.items() ]
+
+    norm_power_values = [ p / max_power for p in power_values ]
+    norm_cost_values = [ c / max_cost for c in cost_values ]
+
+    info("power values")
+    info(power_values)
+    info("cost values")
+    info(cost_values)
+    info("norm power values")
+    info(norm_power_values)
+    info("norm cost values")
+    info(norm_cost_values)
+
+
 def get_results_per_location(cloud, env, schedule):
+    """go through the given schedule and generate results
+    calculate metrics per location
+    """
 
     info("------------------")
     info("serialise results")
@@ -311,7 +352,6 @@ def get_results_per_location(cloud, env, schedule):
     pickle_results(schedule)
     cloud.reset_to_initial()
     info('Simulation timeline\n-------------------')
-    evaluator.print_history(cloud, env, schedule)
 
     # geotemporal inputs
     #-------------------
@@ -352,6 +392,9 @@ def get_results_per_location(cloud, env, schedule):
     total_cloud_power = cloud_power.sum().sum() # in kWh
     total_cloud_costs = cloud_costs.sum() # in $
 
+    total_power = total_cloud_power + migration_energy
+    total_costs = total_cloud_costs + migration_cost + total_penalty_cost
+
     info('Utilisation (%)')
     info(str(cloud_util * 100))
 
@@ -386,6 +429,10 @@ def get_results_per_location(cloud, env, schedule):
     info(total_downtime)
     info(' - total number of migrations')
     info(num_migrations)
+    info(' - total power (kWh)')
+    info(total_power)
+    info(' - total cost ($)')
+    info(total_costs)
 
     if conf.liveplot:
         plt.show()
@@ -394,7 +441,7 @@ def get_results_per_location(cloud, env, schedule):
 
     info('\nDone. Results saved to: {}'.format(conf.output_folder))
     
-    return []
+    return [ total_power, total_costs ]
 
 
 def serialise_results_tests():
