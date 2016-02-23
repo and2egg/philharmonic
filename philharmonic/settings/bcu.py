@@ -42,7 +42,7 @@ output_folder = os.path.join(base_output_folder, "bcu/")
 # 7) cost aware requests and migrations + ideal forecast (assign to cheapest DC based on ideal forecasts and job length)
 
 bcuconf = {
-	'scenario': 7
+	'scenario': 6
 }
 
 factory['scheduler'] = 'BCUScheduler'
@@ -54,17 +54,17 @@ factory['environment'] = 'BCUSimulatedEnvironment'
 
 inputgen_settings['resource_distribution'] = 'uniform' # uniform or normal
 
-inputgen_settings['server_num'] = 100
+inputgen_settings['server_num'] = 10
 inputgen_settings['min_server_cpu'] = 4 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 8 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 200
+inputgen_settings['VM_num'] = 20
 inputgen_settings['min_cpu'] = 1 # 2,
-inputgen_settings['max_cpu'] = 2 # 4,
-inputgen_settings['min_ram'] = 0.5 # 4,
-inputgen_settings['max_ram'] = 2 # 16,
+inputgen_settings['max_cpu'] = 4 # 4,
+inputgen_settings['min_ram'] = 1 # 4,
+inputgen_settings['max_ram'] = 4 # 16,
 
 # inputgen_settings['min_duration'] = 60 * 5 # 5 minute
 # inputgen_settings['max_duration'] = 3600 * 2 # 2 hours
@@ -100,18 +100,23 @@ max_fc_horizon = 12
 
 # weights
 
-w_sla = 0.8
-w_energy = 0.1
-w_vm_rem = 0.4
-w_dcload = 0.2
-w_cost = 0.9
+# w_sla = 0.8
+# w_energy = 0.1
+# w_vm_rem = 0.4
+# w_dcload = 0.2
+# w_cost = 0.9
+w_sla = 0.9
+w_energy = 1.0
+w_vm_rem = 0.1
+w_dcload = 0.1
+w_cost = 0.5
 
 # threshold for deciding on vm migration
 # the sum of all utility values except costs (w_cost) should be smaller
 # than this utility threshold, to make it impossible to reach this 
 # threshold without a positive value of the cost utility
 
-utility_threshold = 1.5
+utility_threshold = 2.0
 
 
 # to evaluate: 
@@ -133,13 +138,13 @@ sla_values = [99.95,99.9,99]
 # if None they will be assigned by a resource distribution
 duration_values = [1,2,5,8,12,24,48]
 # indicates whether different dirty page rates should be assigned to vms
-generate_dpr = False
+generate_dpr = True
 # indicates whether different sla values should be assigned to vms
 generate_sla = False
 # indicates whether fixed duration values (see above) should be used
 fixed_duration = True
 # indicates whether it is possible that vms run for the whole duration of the simulation
-total_duration = False
+total_duration = True
 # indicates whether the sla status of vms should be continuously updated in the simulator
 update_vm_sla = True
 # sets a threshold for price differences, only if the maximum absolute price differences 
@@ -222,9 +227,11 @@ if sim_type == "DA":
 elif sim_type == "RT":
 	bandwidth_map = bandwidth_rt
 
-bandwidth_map = {}
+# bandwidth_map = {}
 
-bandwidth_costs = 0.01 # $ / GB
+bandwidth_costs = 0.001 # $ / GB
+
+vm_price = 0.04 # $ / h
 
 
 add_date_to_folders = True
@@ -243,7 +250,6 @@ transform_to_jouls = False
 prices_in_mwh = True
 alternate_cost_model = True
 location_based = True
-custom_migration_overhead = True
 
 # the frequency at which to generate the power signals
 power_freq = 'H' # '5min'

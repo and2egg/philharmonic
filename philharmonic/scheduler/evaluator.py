@@ -87,6 +87,138 @@ def calculate_cloud_utilisation(cloud, environment, schedule,
     df_util = pd.DataFrame(utilisations_list, times)
     return df_util
 
+
+def calculate_cloud_metrics(cloud, environment, schedule,
+                    start=None, end=None, weights=None, bandwidth_map={}):
+    """ calculate multiple cloud metrics in one go to save on computation time """
+
+    def add_downtime(vm, loc1, loc2):
+        """Add predicted downtime for migration of vm to location loc."""
+        d_pred = ph.calculate_predicted_downtime(vm, loc1, loc2, conf.bandwidth_map)
+        vm.downtime = vm.downtime + d_pred
+
+    if start is None:
+        start = environment.start
+        cloud.reset_to_initial() # TODO: timestamp states and be smarter
+    else:
+        cloud.reset_to_real()
+    if end is None:
+        end = environment.end
+
+    state = cloud.get_current()
+    locations = environment.locations
+
+    initial_utilisations = state.calculate_utilisations_per_location(weights)
+
+    servers_list = []
+    server_dict = {}
+    for loc in locations:
+        servers = environment.servers_per_loc[loc]
+        utilised_servers = filter(lambda s : not state.server_free(s), servers)
+        server_dict[loc] = len(utilised_servers)
+
+    # calculate_cloud_utilisation
+    utilisations_list = [initial_utilisations]
+    # calculate_numservers_per_location
+    servers_list.append(server_dict)
+    # calculate_custom_migration_overhead
+    migration_energy = 0.
+    migration_cost = 0.
+    # calculate_custom_sla_penalties
+    total_penalty_cost = 0
+    total_downtime = 0
+    num_migrations = 0
+
+    all_vms = []
+    times = [start]
+
+
+    for t in schedule.actions.index.unique():
+        if t == start: # we change the initial utilisation right away
+            utilisations_list = []
+            servers_list = []
+            times = []
+        # TODO: precise indexing, not dict
+
+        if isinstance(schedule.actions[t], pd.Series):
+            actions = [action for action in schedule.actions[t].values]
+        else:
+            actions = [schedule.actions[t]]
+        for action in actions:
+            if action.name not in set(['boot', 'delete', 'migrate']):
+                continue # we're not interested in other actions
+
+            if action.name == 'boot':
+                all_vms.append(action.vm)
+
+            vm = action.vm
+            before = cloud.get_current()
+            host_before = before.allocation(action.vm)
+            cloud.apply(action)
+            after = cloud.get_current()
+            host_after = after.allocation(action.vm)
+
+            t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour+1)
+            #if host_before or host_after is None, it's a boot/delete
+            if (action.name == 'migrate' and host_before and
+                host_after and host_before != host_after):
+                price_before = environment.el_prices[host_before.loc][t]
+                price_after = environment.el_prices[host_after.loc][t]
+                mean_el_price = (price_before + price_after) / 2.
+
+                if host_before.loc == host_after.loc:
+                    # TODO: happens only in exceptional cases
+                    continue
+
+                migration_load = ph.calculate_migration_load(vm, host_before.loc, host_after.loc, bandwidth_map)
+                energy = ph.calculate_migration_energy_by_load(migration_load)
+                energy = ph.joul2kwh(energy) # get kWh
+                migration_energy += energy
+                cost = energy * mean_el_price
+                cost += (migration_load / 1000) * conf.bandwidth_costs
+                migration_cost += cost
+
+                add_downtime(vm, host_before.loc, host_after.loc)
+                environment.update_sla(vm)
+                num_migrations += 1
+
+        state = cloud.get_current()
+
+        new_utilisations = state.calculate_utilisations_per_location(weights)
+
+        server_dict = {}
+        for loc in locations:
+            servers = environment.servers_per_loc[loc]
+            utilised_servers = filter(lambda s : not state.server_free(s), servers)
+            server_dict[loc] = len(utilised_servers)
+        
+        utilisations_list.append(new_utilisations)
+        servers_list.append(server_dict)   
+        times.append(t)
+
+    if times[-1] < end:
+        # the last utilisation values hold until the end - duplicate last
+        times.append(end)
+        utilisations_list.append(utilisations_list[-1])
+        servers_list.append(servers_list[-1])
+
+    for vm in all_vms:
+        if vm.downtime > 0:
+            total_downtime += vm.downtime
+        if vm.penalties > 0:
+            duration = environment.vm_duration[vm]
+            hours = duration.total_seconds() / 3600
+            price = conf.vm_price * hours
+            penalty = environment.get_sla_penalty(vm)
+            total_penalty_cost += price * penalty
+
+    cloud_util = pd.DataFrame(utilisations_list, times)
+    active_servers = pd.DataFrame(servers_list, times)
+
+    return [ cloud_util, active_servers, migration_energy, migration_cost,
+                total_penalty_cost, int(total_downtime), num_migrations ]
+
+
 def precreate_synth_power(start, end, servers):
     # P_peak = conf.P_peak
     # P_idle = conf.P_idle
@@ -131,12 +263,11 @@ def generate_cloud_power(util, start=None, end=None,
         power[power > 0] += conf.P_std * np.random.randn(*power.shape)
     return power
 
-def generate_cloud_power_per_location(util, cloud, env, schedule):
+def generate_cloud_power_per_location(util, active_servers, cloud, env, schedule):
     """generate total cloud power per location in kW
     @author Andreas Egger"""
-    numservers_per_location = calculate_numservers_per_location(cloud, env, schedule)
 
-    power_per_location = ph.calculate_power_per_location(util, numservers_per_location)
+    power_per_location = ph.calculate_power_per_location(util, active_servers)
     power_per_location = power_per_location.resample(conf.power_freq, fill_method='pad')
     power_per_location = power_per_location / 1000
     
@@ -547,6 +678,7 @@ def calculate_custom_migration_overhead(cloud, environment, schedule,
 
     total_energy = 0.
     total_cost = 0.
+    count_same_loc = 0
     for t in schedule.actions[start:end].index.unique():
         # TODO: precise indexing, not dict
         if isinstance(schedule.actions[t], pd.Series):
@@ -571,14 +703,111 @@ def calculate_custom_migration_overhead(cloud, environment, schedule,
                 price_after = environment.el_prices[host_after.loc][t]
                 mean_el_price = (price_before + price_after) / 2.
 
-                migration_load = ph.calculate_migration_load(vm, host_after.loc, bandwidth_map)
+                if host_before.loc == host_after.loc:
+                    count_same_loc += 1
+                    continue
+
+                migration_load = ph.calculate_migration_load(vm, host_before.loc, host_after.loc, bandwidth_map)
                 energy = ph.calculate_migration_energy_by_load(migration_load)
                 energy = ph.joul2kwh(energy) # kWh
                 total_energy += energy
                 cost = energy * mean_el_price
                 cost += (migration_load / 1000) * conf.bandwidth_costs
                 total_cost += cost
+
+    # if count_same_loc > 0:
+    #     import ipdb;ipdb.set_trace()
     return total_energy, total_cost
+
+
+def calculate_custom_sla_penalties(cloud, environment, schedule,
+                                 start=None, end=None):
+    """Accumulate sla penalties of all vms encountered during migrations
+
+    There are 3 stages of penalties with different cost implications: 
+
+    penalty 1) + 10% of vm price
+    penalty 2) + 25% of vm price
+    penalty 3) + 50% of vm price
+
+    @param start, end: if given, only this period will be counted,
+    cloud model starts from _real. If not, whole environment.start-end
+    counted and the first state is _initial.
+
+    @returns: cost of aggregated sla penalties
+
+    """
+
+    def add_downtime(vm, loc1, loc2):
+        """Add predicted downtime for migration of vm to location loc."""
+        d_pred = ph.calculate_predicted_downtime(vm, loc1, loc2, conf.bandwidth_map)
+        vm.downtime = vm.downtime + d_pred
+
+    if start is None:
+        start = environment.start
+        cloud.reset_to_initial() # TODO: timestamp states and be smarter
+    else:
+        cloud.reset_to_real()
+    if end is None:
+        end = environment.end
+
+    total_penalty_cost = 0
+    total_downtime = 0
+    num_migrations = 0
+    count_same_loc = 0
+    all_vms = []
+
+    all_actions = [ action for action in schedule.actions[start:end].values if action.name in set(['migrate']) ]
+
+    for t in schedule.actions[start:end].index.unique():
+        # TODO: precise indexing, not dict
+        if isinstance(schedule.actions[t], pd.Series):
+            actions = [action for action in schedule.actions[t].values]
+        else:
+            actions = [schedule.actions[t]]
+        for action in actions:
+            if action.name not in set(['boot', 'delete', 'migrate']):
+                continue # we're not interested in other actions
+
+            vm = action.vm
+            before = cloud.get_current()
+            host_before = before.allocation(action.vm)
+            cloud.apply(action)
+            after = cloud.get_current()
+            host_after = after.allocation(action.vm)
+
+            if action.name == 'boot':
+                all_vms.append(action.vm)
+
+            t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour+1)
+            #if host_before or host_after is None, it's a boot/delete
+            if (action.name == 'migrate' and host_before and
+                host_after and host_before != host_after):
+
+                if host_before.loc == host_after.loc:
+                    count_same_loc += 1
+                    # import ipdb;ipdb.set_trace()
+                    # 2013-07-03 06:00 VM:343
+                    continue
+
+                add_downtime(vm, host_before.loc, host_after.loc)
+                environment.update_sla(vm)
+                num_migrations += 1
+
+    if count_same_loc > 0:
+        pass
+
+    for vm in all_vms:
+        if vm.downtime > 0:
+            total_downtime += vm.downtime
+        if vm.penalties > 0:
+            duration = environment.vm_duration[vm]
+            hours = duration.total_seconds() / 3600
+            price = conf.vm_price * hours
+            penalty = environment.get_sla_penalty(vm)
+            total_penalty_cost += price * penalty
+    return [ total_penalty_cost, int(total_downtime), num_migrations ]
+
 
 # TODO: utilisation, constraint and sla penalties could all be
 # calculated in one pass through the states

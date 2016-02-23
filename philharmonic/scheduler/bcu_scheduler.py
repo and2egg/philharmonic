@@ -89,7 +89,7 @@ class BCUScheduler(IScheduler):
 
     def add_downtime(self, vm, loc):
         """Add predicted downtime for migration of vm to location loc."""
-        d_pred = ph.calculate_predicted_downtime(vm, loc, conf.bandwidth_map)
+        d_pred = ph.calculate_predicted_downtime(vm, vm.server.loc, loc, conf.bandwidth_map)
         vm.downtime = vm.downtime + d_pred
 
 
@@ -175,6 +175,8 @@ class BCUScheduler(IScheduler):
         #  - select VMs on underutilised PMs
         # VMs.extend(self._remove_vms_from_underutilised_hosts())
 
+        current = self.cloud.get_current()
+
         VMs = self.sort_vms_decreasing(VMs)
 
         if len(VMs) == 0:
@@ -191,7 +193,7 @@ class BCUScheduler(IScheduler):
             assigned_vms = self.assign_hosts_by_size(VMs, loc, t)
             
 
-    def evaluate_BCF(self, t, requests, forecast=False, ideal=False):
+    def evaluate_BCF(self, t, requests, forecast=False, ideal=False, optimized=False):
         """evalute requests in a best cost fit fashion.
         Get location based on current or future energy prices,
         sort pms by size increasing, vms by size decreasing and 
@@ -211,10 +213,10 @@ class BCUScheduler(IScheduler):
         if len(VMs) == 0:
             return []
 
-        self.assign_to_cheapest_hosts(t, VMs, forecast, ideal)
+        self.assign_to_cheapest_hosts(t, VMs, forecast, ideal, optimized)
 
 
-    def assign_to_cheapest_hosts(self, t, vms, forecast=False, ideal=False, weighted=False):
+    def assign_to_cheapest_hosts(self, t, vms, forecast=False, ideal=False, weighted=False, optimized=False):
         """Find cheapest host
         if forecast is True assign to hosts at cheapest location based on average of forecasted values
         Otherwise assign to hosts at cheapest location based on current energy price
@@ -228,6 +230,11 @@ class BCUScheduler(IScheduler):
         max_h = 1
         if forecast:
             max_h = conf.max_fc_horizon
+
+        if optimized:
+            total_remaining_dur = self.environment.end - t_next
+            total_remaining_dur = total_remaining_dur.total_seconds() / 3600
+            max_h = int(total_remaining_dur)
 
         for vm in vms:
             vm_remaining = self.environment.get_remaining_duration(vm, t)
@@ -341,7 +348,7 @@ class BCUScheduler(IScheduler):
         # get accumulated downtime of vm
         down_acc = vm.downtime
         # get predicted downtime when migrated to location loc with dpr and bandwidth values
-        down_pred = ph.calculate_predicted_downtime(vm, loc, conf.bandwidth_map)
+        down_pred = ph.calculate_predicted_downtime(vm, vm.server.loc, loc, conf.bandwidth_map)
         
         if vm.penalties < 3:
             sla_th = self.environment.vm_sla_ths[vm][vm.penalties]
@@ -389,7 +396,13 @@ class BCUScheduler(IScheduler):
         for h in range(max_fc+1):
             mean_dist = fc_dict[h][loc1][loc2]
             mean_values.append((h, mean_dist))
-        return max(mean_values, key=lambda x: x[1])
+        max_value = max(mean_values, key=lambda x: x[1])
+
+        # check if the calculated horizon is below the maximum forecast threshold
+        if max_value[0] < conf.max_fc_horizon:
+            return max_value
+        else:
+            return (0, -1) # do not migrate at all
 
 
     def _setup_price_map(self, t_next, forecast=False, ideal=False):
@@ -477,7 +490,7 @@ class BCUScheduler(IScheduler):
         return d
 
 
-    def _prepare_utility_function(self, t_next, forecast=False, ideal=False):
+    def _prepare_utility_function(self, t_next, forecast=False, ideal=False, optimized=False):
         """prepare all criterias to be evaluated in a 
         utility function. Do this in a common method
         to save computation time (iterate over the set
@@ -503,6 +516,11 @@ class BCUScheduler(IScheduler):
         max_h = 0 # inclusive
         if forecast:
             max_h = conf.max_fc_horizon-1
+
+        if optimized:
+            total_remaining_dur = self.environment.end - t_next
+            total_remaining_dur = total_remaining_dur.total_seconds() / 3600
+            max_h = int(total_remaining_dur)
 
         fc_dict = self._calculate_price_differences(t_next, fc_prices, min_h, max_h)
 
@@ -570,10 +588,10 @@ class BCUScheduler(IScheduler):
         return [ migration_vms, sla_penalty, mig_energy, max_mig_energy, remaining_dur, cloud_util, cost_benefit ]
 
 
-    def calculate_utility_function(self, t_next, forecast=False, ideal=False):
+    def calculate_utility_function(self, t_next, forecast=False, ideal=False, optimized=False):
 
         current = self.cloud.get_current()
-        result = self._prepare_utility_function(t_next, forecast, ideal)
+        result = self._prepare_utility_function(t_next, forecast, ideal, optimized)
 
         if  len(result) == 0:
             return []
@@ -600,6 +618,9 @@ class BCUScheduler(IScheduler):
         for vm in vms:
             current_loc = vm.server.loc
             u_value = {}
+
+            # if t_next == pd.Timestamp('2013-07-03 06:00') and vm.id == 343:
+            #     import ipdb;ipdb.set_trace()
             
             for loc in locations:
                 if loc != current_loc:
@@ -616,6 +637,10 @@ class BCUScheduler(IScheduler):
                                 conf.w_dcload    * dcload            +  \
                                 conf.w_cost      * savings
 
+                    # make sure to only migrate when there are at least some energy cost savings expected
+                    if savings <= 0:
+                        result = 0
+
                     u_value[loc] = result
 
             # taking only maximum utility value calculated over all fc horizons for all locations applicable to the vm
@@ -627,14 +652,14 @@ class BCUScheduler(IScheduler):
         return u_result
 
 
-    def evaluate_utility_function(self, t_next, forecast=False, ideal=False):
+    def evaluate_utility_function(self, t_next, forecast=False, ideal=False, optimized=False):
         """Evaluate the utility function results for each vm 
         and return vms with a utility value higher than a 
         specified threshold
 
         """
 
-        u_result = self.calculate_utility_function(t_next, forecast, ideal)
+        u_result = self.calculate_utility_function(t_next, forecast, ideal, optimized)
         if len(u_result) == 0:
             return []
 
@@ -665,6 +690,8 @@ class BCUScheduler(IScheduler):
             self.evaluate_BCF(t, requests, forecast=True)
         elif scenario == 7: 
             self.evaluate_BCF(t, requests, forecast=True, ideal=True)
+        elif scenario == 8: 
+            self.evaluate_BCF(t, requests, forecast=True, ideal=True, optimized=True)
 
 
 
@@ -685,6 +712,8 @@ class BCUScheduler(IScheduler):
             return self.evaluate_utility_function(t_next, forecast=True)
         elif scenario == 7: 
             return self.evaluate_utility_function(t_next, forecast=True, ideal=True)
+        elif scenario == 8:
+            return self.evaluate_utility_function(t_next, forecast=True, ideal=True, optimized=True)
 
 
     def reevaluate(self):

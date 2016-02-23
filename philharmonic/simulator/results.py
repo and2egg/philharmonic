@@ -122,6 +122,12 @@ def generate_series_results(cloud, env, schedule, nplots):
 
 
 def serialise_results(cloud, env, schedule):
+
+    if conf.location_based:
+        get_results_per_location(cloud, env, schedule)
+        return []
+
+
     fig = plt.figure(1)#, figsize=(10, 15))
     fig.subplots_adjust(bottom=0.2, top=0.9, hspace=0.5)
 
@@ -159,56 +165,6 @@ def serialise_results(cloud, env, schedule):
                                                  env.temperature,
                                                  locationBased=conf.location_based)
 
-
-    if conf.location_based:
-        # calculate utilisation
-        if conf.custom_weights is not None:
-            util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, 
-                                    weights=conf.custom_weights, locationBased=conf.location_based)
-        else:
-            util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, locationBased=conf.location_based)
-
-        # calculate cloud power and costs
-        cloud_power = evaluator.generate_cloud_power_per_location(util, cloud, env, schedule)
-        # cloud costs per location
-        cloud_costs = ph.calculate_price_new(cloud_power, env.el_prices, transform_to_jouls=False)
-
-        total_cloud_power = cloud_power.sum().sum() # in kW
-        total_cloud_costs = cloud_costs.sum() # in $
-
-        if conf.custom_migration_overhead:
-            migration_energy, migration_cost = evaluator.calculate_custom_migration_overhead(
-                cloud, env, schedule, bandwidth_map=conf.bandwidth_map
-            )
-        else:
-            migration_energy, migration_cost = evaluator.calculate_migration_overhead(
-                cloud, env, schedule
-            )
-
-        # Aggregated results
-        #===================
-        info('\nAggregated results\n------------------')
-        info(' - cloud power (kW)')
-        info(total_cloud_power)
-        info(' - cloud cost ($)')
-        info(total_cloud_costs)
-        info('Migration energy (kWh)')
-        info(migration_energy)
-        info('Migration cost ($)')
-        info(migration_cost)
-        info(' - cloud power with migrations:')
-        info(total_cloud_power + migration_energy)
-        info(' - cloud cost with migrations:')
-        info(total_cloud_costs + migration_cost)
-
-        if conf.liveplot:
-            plt.show()
-        elif conf.fileplot:
-            plt.savefig(output_loc('results-graph.pdf'))
-
-        info('\nDone. Results saved to: {}'.format(conf.output_folder))
-        
-        return []
 
 
     # Aggregated results
@@ -339,6 +295,106 @@ def serialise_results(cloud, env, schedule):
     info('\nDone. Results saved to: {}'.format(conf.output_folder))
 
     return aggregated_results
+
+
+def get_results_per_location(cloud, env, schedule):
+
+    info("------------------")
+    info("serialise results")
+    info("------------------")
+
+    # output
+    fig = plt.figure(1)#, figsize=(10, 15))
+    fig.subplots_adjust(bottom=0.2, top=0.9, hspace=0.5)
+
+    nplots = 4
+    pickle_results(schedule)
+    cloud.reset_to_initial()
+    info('Simulation timeline\n-------------------')
+    evaluator.print_history(cloud, env, schedule)
+
+    # geotemporal inputs
+    #-------------------
+    ax = plt.subplot(nplots, 1, 1)
+    ax.set_title('Electricity prices ($/kWh)')
+    env.el_prices.plot(ax=ax)
+
+
+    # # calculate utilisation
+    # if conf.custom_weights is not None:
+    #     util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, 
+    #                             weights=conf.custom_weights, locationBased=conf.location_based)
+    # else:
+    #     util = evaluator.calculate_cloud_utilisation(cloud, env, schedule,
+    #                             locationBased=conf.location_based)
+
+    # migration_energy, migration_cost = evaluator.calculate_custom_migration_overhead(
+    #     cloud, env, schedule, bandwidth_map=conf.bandwidth_map
+    # )
+
+    # [ total_penalty_cost, total_downtime, num_migrations ] = evaluator.calculate_custom_sla_penalties(cloud, env, schedule)
+
+    if conf.custom_weights is not None:
+
+        [  cloud_util, active_servers, migration_energy, migration_cost,
+            total_penalty_cost, total_downtime, num_migrations ] = evaluator.calculate_cloud_metrics(cloud, env, schedule, weights=conf.custom_weights, bandwidth_map=conf.bandwidth_map)
+
+    else:
+
+        [  cloud_util, active_servers, migration_energy, migration_cost,
+            total_penalty_cost, total_downtime, num_migrations ] = evaluator.calculate_cloud_metrics(cloud, env, schedule, bandwidth_map=conf.bandwidth_map)
+
+    # calculate cloud power in kWh
+    cloud_power = evaluator.generate_cloud_power_per_location(cloud_util, active_servers, cloud, env, schedule)
+    # cloud costs per location
+    cloud_costs = ph.calculate_price_new(cloud_power, env.el_prices, transform_to_jouls=False)
+
+    total_cloud_power = cloud_power.sum().sum() # in kWh
+    total_cloud_costs = cloud_costs.sum() # in $
+
+    info('Utilisation (%)')
+    info(str(cloud_util * 100))
+
+    info('\nMax of Avg. PM Utilization')
+    info(cloud_util.mean().max())
+
+    # mean utilization
+    info('\nAvg.Utilization')
+    info(cloud_util.mean().mean())
+
+    info('\nMax Utilization')
+    info(cloud_util.max().max())
+
+    # Aggregated results
+    #===================
+    info('\nAggregated results\n------------------')
+    info(' - cloud power (kWh)')
+    info(total_cloud_power)
+    info(' - cloud cost ($)')
+    info(total_cloud_costs)
+    info('Migration energy (kWh)')
+    info(migration_energy)
+    info('Migration cost ($)')
+    info(migration_cost)
+    info(' - cloud power with migrations:')
+    info(total_cloud_power + migration_energy)
+    info(' - cloud cost with migrations:')
+    info(total_cloud_costs + migration_cost)
+    info(' - total penalty cost')
+    info(total_penalty_cost)
+    info(' - total downtime (s)')
+    info(total_downtime)
+    info(' - total number of migrations')
+    info(num_migrations)
+
+    if conf.liveplot:
+        plt.show()
+    elif conf.fileplot:
+        plt.savefig(output_loc('results-graph.pdf'))
+
+    info('\nDone. Results saved to: {}'.format(conf.output_folder))
+    
+    return []
 
 
 def serialise_results_tests():

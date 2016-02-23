@@ -105,7 +105,9 @@ bandwidth = 1000
 # if empty, bandwidth will be assigned a fixed value
 bandwidth_map = {}
 
-bandwidth_costs = 0.01 # $ / GB
+bandwidth_costs = 0.001 # $ / GB
+
+vm_price = 0.04 # $ / h
 
 
 #################################
@@ -392,8 +394,6 @@ transform_to_jouls = True
 prices_in_mwh = False
 
 alternate_cost_model = False
-
-custom_migration_overhead = False
 
 location_based = False
 

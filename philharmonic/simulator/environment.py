@@ -326,11 +326,12 @@ class BCUSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
         based on its accumulated downtime
         """
         if vm.downtime > self.vm_sla_ths[vm][2]:
-            return 1.5
+            return 0.5
         if vm.downtime > self.vm_sla_ths[vm][1]:
-            return 1.25
+            return 0.25
         if vm.downtime > self.vm_sla_ths[vm][0]:
-            return 1.1
+            return 0.1
+        return 0
 
     def _get_sla_penalty_mapping(self, sla):
         """get sla penalty mapping for each defined sla
@@ -342,6 +343,7 @@ class BCUSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
             return [99.9, 99, 95]
         if sla == 99:
             return [99, 98, 95]
+        return []
 
     def update_sla(self, vm):
         """update the penalty status of a vm"""

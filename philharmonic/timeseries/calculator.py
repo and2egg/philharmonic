@@ -28,7 +28,7 @@ def calculate_power(util, P_idle=100, P_peak=200):
     P[P>0] += P_idle
     return P
 
-def calculate_power_per_location(util, numservers_per_location, P_idle=100, P_peak=200):
+def calculate_power_per_location(util, active_servers, P_idle=100, P_peak=200):
     """Given a DataFrame of server utilisations, calculate power. This
     model is often used, e.g. in:
 
@@ -38,7 +38,7 @@ def calculate_power_per_location(util, numservers_per_location, P_idle=100, P_pe
     """
     P = util * (P_peak - P_idle) # dynamic part
     # a server with no load is suspended (otherwise idle power applies)
-    P[P>0] += numservers_per_location * P_idle
+    P[P>0] += active_servers * P_idle
 
     ## example
     ## 
@@ -125,7 +125,7 @@ def calculate_migration_time(vm, bandwidth=100):
     seconds = vm.res['RAM'] * 1000 / (bandwidth/8.)
     return seconds
 
-def calculate_predicted_downtime(vm, loc, bandwidth_map={}):
+def calculate_predicted_downtime(vm, loc1, loc2, bandwidth_map={}):
     """
     Calculate the predicted downtime for this VM
     based on the current memory consumption, 
@@ -135,8 +135,6 @@ def calculate_predicted_downtime(vm, loc, bandwidth_map={}):
     if len(bandwidth_map) == 0:
         bandwidth = R
     else:
-        loc1 = vm.server.loc
-        loc2 = loc
         bandwidth = bandwidth_map[loc1][loc2]
     try:
         if vm.dpr >= (bandwidth / 8.):
@@ -161,7 +159,7 @@ def calculate_migration_energy(vm, loc, bandwidth_map={}):
     dirty page rate and bandwidth from the location
     it should be migrated to
     """
-    migration_data = calculate_migration_load(vm, loc, bandwidth_map)
+    migration_data = calculate_migration_load(vm, vm.server.loc, loc, bandwidth_map)
     energy = E_mig_custom(migration_data)
     return energy
 
@@ -175,7 +173,7 @@ def calculate_migration_energy_by_load(migration_data):
     energy = E_mig_custom(migration_data)
     return energy
 
-def calculate_migration_load(vm, loc, bandwidth_map={}):
+def calculate_migration_load(vm, loc1, loc2, bandwidth_map={}):
     """
     Calculate the migration load (in MB) for this VM
     based on the current memory consumption, 
@@ -183,11 +181,9 @@ def calculate_migration_load(vm, loc, bandwidth_map={}):
     it should be migrated to
     """
     memory = vm.res['RAM'] * 1000 # MB
-    if len(bandwidth_map) == 0:
+    if len(bandwidth_map) == 0 or loc1 == loc2:
         bandwidth = R
     else:
-        loc1 = vm.server.loc
-        loc2 = loc
         bandwidth = bandwidth_map[loc1][loc2]
     try:
         if vm.dpr >= (bandwidth / 8.):
