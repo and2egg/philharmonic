@@ -481,7 +481,7 @@ def run_batch(steps=None, custom_scheduler=None):
     info('\nSIMULATION\n##########\n')
     start_time = datetime.now()
     info('Simulation started at time: {}'.format(start_time))
-    simulation_parameters = simulator.run_batch(steps, [1,2])
+    simulation_parameters = simulator.run_batch(steps, [1,2,3,4,5,6,7])
     info('RESULTS\n#######\n')
 
     # serialise and log the results

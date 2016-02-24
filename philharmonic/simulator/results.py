@@ -48,19 +48,6 @@ def generate_series_results(cloud, env, schedule, nplots):
     # ax.set_title('Utilisation (%)')
     # util.plot(ax=ax)
 
-    # example: running 100 servers for 14 days at full power (200W)
-    #   equals max_power = 0.2kW * 100 * 24 * 14 = 6720 kW = 6.72 MW
-    #   for the simulation with 200 vms the total power draw is 70.4 kW
-    #    (according to parts of utilisation of max_power)
-    #   real power draw from simulation: (power / 1000).sum().sum() = 64.27 kW
-    #   utilisation is averaged over all locations: 
-    #           util_per_loc = util.sum() / len(util)
-    #           total_util = util_per_loc.sum() / len(util_per_loc)
-    #   energy costs: assuming an average price of 0.03 $/kWh the costs for this 
-    #           simulation are about 2 $
-    #           results from real simulation with 100 servers: 1.84 $
-    #   exact simulation reference: bcu/2016-02-21/172949_*
-
     # cloud power consumption
     #------------------    
     if conf.location_based:
@@ -296,15 +283,49 @@ def serialise_results(cloud, env, schedule):
     return aggregated_results
 
 
+def scenario_name_mapping(scenario):
+    mapping = {
+        '1': 'BFD',
+        '2': 'BCU',
+        '3': 'BCU_F',
+        '4': 'BCU_IF',
+        '5': 'BCU_M',
+        '6': 'BCU_MF',
+        '7': 'BCU_MIF'
+    }
+
+    return mapping[scenario]
+
+def scenario_name_mappings(scenarios):
+    mapping = {
+        '1': 'BFD',
+        '2': 'BCU',
+        '3': 'BCU_F',
+        '4': 'BCU_IF',
+        '5': 'BCU_M',
+        '6': 'BCU_MF',
+        '7': 'BCU_MIF'
+    }
+
+    mappings = []
+    for s in scenarios:
+        mappings.append(mapping[str(s)])
+
+    return mappings
+
+
 def serialise_results_batch(simulation_parameters):
 
     info("serialise_results_batch\n-----------------")
 
     power_vs_costs = {}
 
+    scenarios = []
+
     for sim_param in simulation_parameters.items():
 
         scenario = sim_param[0]
+        scenarios.append(scenario)
         [ cloud, env, schedule ] = sim_param[1]
 
         info("====================\n\n")
@@ -324,6 +345,46 @@ def serialise_results_batch(simulation_parameters):
 
     norm_power_values = [ p / max_power for p in power_values ]
     norm_cost_values = [ c / max_cost for c in cost_values ]
+
+
+    # aggregated = power_values
+    # aggr_names = ['BFD', 'BCU'
+    #                 # 'BCU', 'BCU_F', 'BCU_IF',
+    #                 # 'BCU_M', 'BCU_MF', 'BCU_MIF'
+    #             ]
+    # # http://en.wikipedia.org/wiki/Gross_profit
+    # # Towards Profitable Virtual Machine Placement in the Data Center Shi
+    # # and Hong 2011 - total profit, revenue and operational cost
+    # aggregated_results = pd.Series(aggregated, aggr_names)
+    # aggregated_results.to_pickle(output_loc('results.pkl'))
+
+    results = {}
+    results_norm = {}
+
+    scenario_names = scenario_name_mappings(scenarios)
+    columns = ['power','cost']
+
+    results['power'] = pd.Series(power_values, scenario_names)
+    results['cost'] = pd.Series(cost_values, scenario_names)
+
+    result_df = pd.DataFrame(results)
+    result_df = result_df[columns]
+    result_df.to_pickle(output_loc('results.pkl'))
+
+    
+    results_norm['power'] = pd.Series(norm_power_values, scenario_names)
+    results_norm['cost'] = pd.Series(norm_cost_values, scenario_names)
+
+    result_df_norm = pd.DataFrame(results_norm)
+    result_df_norm = result_df_norm[columns]
+    result_df_norm.to_pickle(output_loc('results_norm.pkl'))
+
+
+    info('\n')
+    info(results)
+    info(results_norm)
+
+
 
     info("power values")
     info(power_values)
@@ -359,21 +420,6 @@ def get_results_per_location(cloud, env, schedule):
     ax.set_title('Electricity prices ($/kWh)')
     env.el_prices.plot(ax=ax)
 
-
-    # # calculate utilisation
-    # if conf.custom_weights is not None:
-    #     util = evaluator.calculate_cloud_utilisation(cloud, env, schedule, 
-    #                             weights=conf.custom_weights, locationBased=conf.location_based)
-    # else:
-    #     util = evaluator.calculate_cloud_utilisation(cloud, env, schedule,
-    #                             locationBased=conf.location_based)
-
-    # migration_energy, migration_cost = evaluator.calculate_custom_migration_overhead(
-    #     cloud, env, schedule, bandwidth_map=conf.bandwidth_map
-    # )
-
-    # [ total_penalty_cost, total_downtime, num_migrations ] = evaluator.calculate_custom_sla_penalties(cloud, env, schedule)
-
     if conf.custom_weights is not None:
 
         [  cloud_util, active_servers, migration_energy, migration_cost,
@@ -383,6 +429,20 @@ def get_results_per_location(cloud, env, schedule):
 
         [  cloud_util, active_servers, migration_energy, migration_cost,
             total_penalty_cost, total_downtime, num_migrations ] = evaluator.calculate_cloud_metrics(cloud, env, schedule, bandwidth_map=conf.bandwidth_map)
+
+
+    # example: running 100 servers for 14 days at full power (200W)
+    #   equals max_power = 0.2kW * 100 * 24 * 14 = 6720 kW = 6.72 MW
+    #   for the simulation with 200 vms the total power draw is 70.4 kW
+    #    (according to parts of utilisation of max_power)
+    #   real power draw from simulation: (power / 1000).sum().sum() = 64.27 kW
+    #   utilisation is averaged over all locations: 
+    #           util_per_loc = util.sum() / len(util)
+    #           total_util = util_per_loc.sum() / len(util_per_loc)
+    #   energy costs: assuming an average price of 0.03 $/kWh the costs for this 
+    #           simulation are about 2 $
+    #           results from real simulation with 100 servers: 1.84 $
+    #   exact simulation reference: bcu/2016-02-21/172949_*
 
     # calculate cloud power in kWh
     cloud_power = evaluator.generate_cloud_power_per_location(cloud_util, active_servers, cloud, env, schedule)
