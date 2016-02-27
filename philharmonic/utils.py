@@ -25,20 +25,35 @@ def mkdir_p(path):
 def input_loc(filepath):
     """get the file path based on the configured input folder"""
     from philharmonic import conf
-    if conf.add_date_to_folders:
-        return loc_date(os.path.join(filepath),
-                        input_loc=True)
+    if conf.sim_type is not None:
+        if conf.add_date_to_folders:
+            return loc_date(conf.sim_type + "_" + filepath,
+                            input_loc=True)
+        else:
+            return loc_normal(conf.sim_type + "_" + filepath,
+                            input_loc=True)
     else:
-        return loc_normal(os.path.join(filepath),
-                        input_loc=True)
+        if conf.add_date_to_folders:
+            return loc_date(filepath,
+                            input_loc=True)
+        else:
+            return loc_normal(filepath,
+                            input_loc=True)
 
 def output_loc(filepath):
     """get the file path based on the configured output folder"""
     from philharmonic import conf
-    if conf.add_date_to_folders:
-        return loc_date(filepath, input_loc=False)
+    
+    if conf.sim_type is not None:
+        if conf.add_date_to_folders:
+            return loc_date(conf.sim_type + "_" + filepath, input_loc=False)
+        else:
+            return loc_normal(conf.sim_type + "_" + filepath, input_loc=False)
     else:
-        return loc_normal(filepath, input_loc=False)
+        if conf.add_date_to_folders:
+            return loc_date(filepath, input_loc=False)
+        else:
+            return loc_normal(filepath, input_loc=False)
 
 def loc_normal(filepath, input_loc):
     from philharmonic import conf

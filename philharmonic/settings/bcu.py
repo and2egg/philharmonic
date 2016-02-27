@@ -42,7 +42,7 @@ output_folder = os.path.join(base_output_folder, "bcu/")
 # 7) cost aware requests and migrations + ideal forecast (assign to cheapest DC based on ideal forecasts and job length)
 
 bcuconf = {
-	'scenario': 6
+	'scenario': 1
 }
 
 factory['scheduler'] = 'BCUScheduler'
@@ -54,13 +54,13 @@ factory['environment'] = 'BCUSimulatedEnvironment'
 
 inputgen_settings['resource_distribution'] = 'uniform' # uniform or normal
 
-inputgen_settings['server_num'] = 10
+inputgen_settings['server_num'] = 700
 inputgen_settings['min_server_cpu'] = 4 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 8 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 20
+inputgen_settings['VM_num'] = 7000
 inputgen_settings['min_cpu'] = 1 # 2,
 inputgen_settings['max_cpu'] = 4 # 4,
 inputgen_settings['min_ram'] = 1 # 4,
@@ -105,11 +105,11 @@ max_fc_horizon = 12
 # w_vm_rem = 0.4
 # w_dcload = 0.2
 # w_cost = 0.9
-w_sla = 0.9
-w_energy = 1.0
-w_vm_rem = 0.1
+w_sla = 1.0
+w_energy = 0.1
+w_vm_rem = 0.2
 w_dcload = 0.1
-w_cost = 0.5
+w_cost = 1.0
 
 # threshold for deciding on vm migration
 # the sum of all utility values except costs (w_cost) should be smaller
@@ -117,14 +117,6 @@ w_cost = 0.5
 # threshold without a positive value of the cost utility
 
 utility_threshold = 2.0
-
-
-# to evaluate: 
-# simulation, inputgen 2016-02-18 200211
-# 
-# 2014-07-11 20:00 - normal u value (1.5)
-# 2014-07-17 10:00 - high u value (2.7)
-# 2014-07-18 21:00 - ultra high u value (4.4)
 
 
 
@@ -144,15 +136,28 @@ generate_sla = False
 # indicates whether fixed duration values (see above) should be used
 fixed_duration = True
 # indicates whether it is possible that vms run for the whole duration of the simulation
-total_duration = True
+total_duration = False
 # indicates whether the sla status of vms should be continuously updated in the simulator
 update_vm_sla = True
 # sets a threshold for price differences, only if the maximum absolute price differences 
 # are above the threshold will vms be chosen for migration for the current iteration
-min_price_threshold = 0.001
+min_price_threshold = 0.001 # 1 $ / kWh
 # minimum remaining duration of vm in simulation timesteps to be considered for migration
 min_vm_remaining = 1
 
+
+
+
+# P = 0.2 * 1000 * 38 * 24 = 182400 kW
+# C = P * 0.04 $ = 7296 (with average energy price of 0.04 $/kWh)
+# 7296 $, 182400 kW over simulation time range for 200 servers at peak
+
+# 38*24 timestamps = 912
+# avg duration of vm = 12 h
+# -> number of time spans of consecutive vms = 912 / 12 = 76
+# -> with 1 server and 76 vms started there is approx. 1 vm active on average
+# 		server utilisation ~ 1/4 to 1/2
+# 
 
 
 bandwidth_da = {
@@ -163,7 +168,7 @@ bandwidth_da = {
 		'Hamina': 1000, 'St.Ghislain': 800, 'Portland': 400, 'Boston': 400
 	},
 	'St.Ghislain': {
-		'Hamina': 1000, 'Potsdam': 800, 'Portland': 400, 'Boston': 400
+		'Hamina': 800, 'Potsdam': 800, 'Portland': 400, 'Boston': 400
 	},
 	'Portland': {
 		'Hamina': 400, 'St.Ghislain': 400, 'Potsdam': 400, 'Boston': 800
@@ -175,56 +180,73 @@ bandwidth_da = {
 
 bandwidth_rt = {
 	'Portland': {
-		'Boston': 800, 'Richmond': 400, 'Brighton': 400, 'Hatfield': 400, 'Madison': 400, 'Georgetown': 400
+		'Boston': 1000, 'Richmond': 800, 'Brighton': 800, 'Hatfield': 800, 'Madison': 800, 'Georgetown': 800
 	},
 	'Boston': {
-		'Portland': 800, 'Richmond': 400, 'Brighton': 400, 'Hatfield': 400, 'Madison': 400, 'Georgetown': 400
+		'Portland': 1000, 'Richmond': 800, 'Brighton': 800, 'Hatfield': 800, 'Madison': 800, 'Georgetown': 800
 	},
 	'Richmond': {
-		'Brighton': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+		'Brighton': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 800, 'Boston': 800
 	},
 	'Brighton': {
-		'Richmond': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+		'Richmond': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 800, 'Boston': 800
 	},
 	'Hatfield': {
-		'Richmond': 1000, 'Brighton': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+		'Richmond': 1000, 'Brighton': 1000, 'Madison': 1000, 'Georgetown': 1000, 'Portland': 800, 'Boston': 800
 	},
 	'Madison': {
-		'Richmond': 1000, 'Brighton': 1000, 'Hatfield': 1000, 'Georgetown': 1000, 'Portland': 400, 'Boston': 400
+		'Richmond': 1000, 'Brighton': 1000, 'Hatfield': 1000, 'Georgetown': 1000, 'Portland': 800, 'Boston': 800
 	},
 	'Georgetown': {
-		'Richmond': 1000, 'Brighton': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Portland': 400, 'Boston': 400
+		'Richmond': 1000, 'Brighton': 1000, 'Hatfield': 1000, 'Madison': 1000, 'Portland': 800, 'Boston': 800
 	}
 }
 
 
 
-#### General Settings ####
+#### Cloud Settings ####
 
 # DATA_LOC_SIM_DA: DA input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
 # DATA_LOC_SIM_RT: RT input from USA (ISO-NE, PJM)
 
-sim_type = "DA" # DA or RT
+sim_type = "RT_Summer" # DA or RT with season
 
-if sim_type == "DA":
+if sim_type == "DA_Spring":
+	DATA_LOC = DATA_LOC_SIM_DA
+
+	el_price_dataset = os.path.join(DATA_LOC, 'prices_da_Spring_2013.csv')
+	el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc_Spring_2013.csv')
+
+elif sim_type == "DA_Summer":
 	DATA_LOC = DATA_LOC_SIM_DA
 
 	el_price_dataset = os.path.join(DATA_LOC, 'prices_da_Jun_July_2013.csv')
 	el_price_forecast = os.path.join(DATA_LOC, 'prices_da_fc_Jun_July_2013.csv')
 
-elif sim_type == "RT":
+elif sim_type == "RT_Spring":
+	DATA_LOC = DATA_LOC_SIM_RT
+
+	el_price_dataset = os.path.join(DATA_LOC, 'prices_rt_Spring_2013.csv')
+	el_price_forecast = os.path.join(DATA_LOC, 'prices_rt_fc_Spring_2013.csv')
+
+elif sim_type == "RT_Summer":
 	DATA_LOC = DATA_LOC_SIM_RT
 
 	el_price_dataset = os.path.join(DATA_LOC, 'prices_rt_Jun_July_2013.csv')
 	el_price_forecast = os.path.join(DATA_LOC, 'prices_rt_fc_Jun_July_2013.csv')
 
 
+output_folder = os.path.join(output_folder, sim_type+"/")
+
+base_settings_path = "philharmonic/settings/"
+settings_file = os.path.join(base_settings_path, "bcu.py")
+
 # if empty, bandwidth will be assigned a fixed value
 bandwidth_map = {}
-if sim_type == "DA":
+if sim_type.startswith("DA"):
 	bandwidth_map = bandwidth_da
 
-elif sim_type == "RT":
+elif sim_type.startswith("RT"):
 	bandwidth_map = bandwidth_rt
 
 # bandwidth_map = {}
@@ -236,9 +258,12 @@ vm_price = 0.04 # $ / h
 
 add_date_to_folders = True
 
+prompt_configuration = False
+
 dynamic_locations = True
 
-prompt_configuration = True
+# state whether debug outputs should be printed
+debug = True
 
 
 power_freq_model = False
@@ -270,6 +295,22 @@ factory['forecast_type'] = 'local_forecasts'
 factory['el_prices'] = 'el_prices_from_conf'
 # possible values: forecast_el_from_conf, mixed_2_loc_fc
 factory['forecast_el'] = 'forecast_el_from_conf'
+
+# get servers from pickle files located 
+# in folders specific to the respective scenarios
+factory['cloud'] = 'servers_from_pickle_with_scenario'
+# get requests from pickle files located 
+# in folders specific to the respective scenarios
+factory['requests'] = 'requests_from_pickle_with_scenario'
+
+# Timestamps of the simulation. Can be:
+#  times_from_conf (take times from conf.times, recommended),
+#  times_from_el_prices (take times from electricity prices - dynamic!)
+#  two_days, world_three_months,
+#  usa_two_hours, usa_two_days, usa_three_months
+#  world_two_hours, world_two_days, world_three_months
+#  dynamic_usa_times, usa_whole_period
+factory['times'] = 'times_from_el_prices'
 factory['temperature'] = None
 factory['forecast_periods'] = 5
 factory['SD_el'] = 0
@@ -299,11 +340,16 @@ else:
 # start = prices.index[0]
 # end= prices.index[-1]
 
-# the time period of the simulation
-start = pd.Timestamp('2013-06-20 00:00')
 
-# TODO Andreas: Make this setting dynamic, or define as property in each settings file
-times = pd.date_range(start, periods=24 * 14, freq='H') # * 38
+######################################
+# these settings are only relevant when 
+# factory['times'] is set to 'times_from_conf'
+#
+# start time of the simulation
+start = pd.Timestamp('2013-06-20 00:00')
+# times of the whole simulation range
+times = pd.date_range(start, periods=24 * 38, freq='H')
+# end time of the simulation
 end = times[-1]
 
 custom_weights = {'RAM': 0.3, '#CPUs': 0.7}

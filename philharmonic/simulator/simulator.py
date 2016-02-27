@@ -19,6 +19,7 @@ and simulates the outcome of the schedule.
 
 import pickle
 from datetime import datetime
+from shutil import copy
 import pprint
 
 from philharmonic import conf
@@ -137,6 +138,7 @@ class Simulator(IManager):
         super(Simulator, self).__init__()
         self.environment.el_prices = self._create(inputgen,
                                                   self.factory['el_prices'])
+
         if self.factory['temperature'] is None:
             self.environment.temperature = None
         else:
@@ -234,7 +236,8 @@ class Simulator(IManager):
             if 'schedule' in locals():
                 actions = schedule.filter_current_actions(t, period)
                 if len(actions) > 0:
-                    debug('Applying Planned Actions:\n{}\n'.format(actions))
+                    if conf.debug:
+                        debug('Applying Planned Actions:\n{}\n'.format(actions))
                     self.apply_actions(actions)
 
             # - apply requests on the simulated cloud
@@ -245,17 +248,16 @@ class Simulator(IManager):
 
             period = self.environment.get_period()
             actions = schedule.filter_current_actions(t, period)
-            if len(requests) > 0:
+            if len(requests) > 0 and conf.debug:
                 debug('Requests:\n{}\n'.format(requests))
-            if len(actions) > 0:
+            if len(actions) > 0 and conf.debug:
                 debug('Applying:\n{}\n'.format(actions))
             planned_actions = schedule.filter_current_actions(t + period)
-            if len(planned_actions) > 0:
+            if len(planned_actions) > 0 and conf.debug:
                 debug('Planned:\n{}\n'.format(planned_actions))
             self.apply_actions(actions)
             if conf.update_vm_sla == True:
                 self.update_vm_states()
-            # import ipdb; ipdb.set_trace()
             if conf.show_cloud_interval is not None and t == t_show:
                 t_show = t_show + conf.show_cloud_interval
                 self.show_cloud_usage()
@@ -276,13 +278,13 @@ class Simulator(IManager):
 
         for scenario in scenarios:
 
-
             self.__init__()
             self.scheduler.set_scenario(scenario)
 
             if conf.show_cloud_interval is not None:
                 t_show = conf.start + conf.show_cloud_interval
             self.scheduler.initialize()
+            start = datetime.now()
             passed_steps = 0
             for t in self.environment.itertimes(): # iterate through all the times
                 passed_steps += 1
@@ -301,7 +303,8 @@ class Simulator(IManager):
                 if 'schedule' in locals():
                     actions = schedule.filter_current_actions(t, period)
                     if len(actions) > 0:
-                        debug('Applying Planned Actions:\n{}\n'.format(actions))
+                        if conf.debug:
+                            debug('Applying Planned Actions:\n{}\n'.format(actions))
                         self.apply_actions(actions)
 
                 # - apply requests on the simulated cloud
@@ -312,12 +315,12 @@ class Simulator(IManager):
 
                 period = self.environment.get_period()
                 actions = schedule.filter_current_actions(t, period)
-                if len(requests) > 0:
+                if len(requests) > 0 and conf.debug:
                     debug('Requests:\n{}\n'.format(requests))
-                if len(actions) > 0:
+                if len(actions) > 0 and conf.debug:
                     debug('Applying:\n{}\n'.format(actions))
                 planned_actions = schedule.filter_current_actions(t + period)
-                if len(planned_actions) > 0:
+                if len(planned_actions) > 0 and conf.debug:
                     debug('Planned:\n{}\n'.format(planned_actions))
                 self.apply_actions(actions)
                 if conf.update_vm_sla == True:
@@ -330,6 +333,11 @@ class Simulator(IManager):
             info("RUN FINISHED FOR SCENARIO "+str(scenario))
 
             simulation_parameters[scenario] = [ self.cloud, self.environment, self.real_schedule ]
+
+            end = datetime.now()
+
+            conf.scheduler_run_times[scenario] = end - start
+
 
         return simulation_parameters
 
@@ -382,6 +390,9 @@ class NoSchedulerSimulator(Simulator):
 
 
 #-- common functions --------------------------------
+
+def copy_settings_file(path):
+    copy(path, input_loc('bcu.py'))
 
 def log_config_info(simulator):
     """Log the essential configuration information."""
@@ -476,11 +487,13 @@ def run_batch(steps=None, custom_scheduler=None):
 
     before_start(simulator)
 
+    copy_settings_file(conf.settings_file)
+
     # run the simulation
     #-------------------
     info('\nSIMULATION\n##########\n')
-    start_time = datetime.now()
-    info('Simulation started at time: {}'.format(start_time))
+    conf.start_time = datetime.now()
+    info('Simulation started at time: {}'.format(conf.start_time))
     simulation_parameters = simulator.run_batch(steps, [1,2,3,4,5,6,7])
     info('RESULTS\n#######\n')
 
@@ -488,9 +501,9 @@ def run_batch(steps=None, custom_scheduler=None):
     #------------------------------
     results = serialise_results_batch(simulation_parameters)
 
-    end_time = datetime.now()
-    info('Simulation finished at time: {}'.format(end_time))
-    info('Duration: {}\n'.format(end_time - start_time))
+    conf.end_time = datetime.now()
+    info('Simulation finished at time: {}'.format(conf.end_time))
+    info('Duration: {}\n'.format(conf.end_time - conf.start_time))
     return results
 
 if __name__ == "__main__":

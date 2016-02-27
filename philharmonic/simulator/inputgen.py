@@ -379,7 +379,7 @@ def uniform_vmreqs(start, end, round_to_hour=True, **kwargs):
         sla_values = conf.sla_values
         slas = distribution_population_fixed(VM_num, distribution=resource_distribution, 
                                         values=sla_values)
-        
+
     if conf.fixed_duration and conf.duration_values is not None:
         duration_values = conf.duration_values # fixed set of durations
         if conf.total_duration: # vms for the whole duration of the simulation
@@ -731,6 +731,13 @@ def parse_dataset(filepath, custom_date_parser=None):
 def times_from_conf():
     return conf.times
 
+def times_from_el_prices():
+    el_prices = parse_dataset(conf.el_price_dataset, conf.date_parser)
+    start = el_prices.index[0]
+    end = el_prices.index[-conf.max_fc_horizon-1] # leave space for forecasting
+    times = pd.date_range(start, end, freq='H')
+    return times
+
 def el_prices_from_web_service():
     pass
 
@@ -806,6 +813,48 @@ def generate_fixed_input():
     info('Wrote to {}:\n - servers.pkl\n - requests.pkl\n'.format(
         common_loc('workload')))
 
+# initial dynamic input generation (read from el prices)
+#----------------------------------------------------
+
+def generate_dynamic_input():
+    """Entry function to generate servers and requests based
+    on the simulation time period and locations read from an energy price file.
+
+    """
+    _override_settings()
+    # get function reference
+    get_locations = globals()[conf.factory['el_prices']]
+    df = get_locations()
+    locations = df.columns.values
+
+    f_times = globals()[conf.factory['times']]
+    times = f_times()
+    start = times[0]
+    end = times[-1]
+
+    info('Generating input datasets\n-------------------------\nParameters:\n' +
+         '- location_dataset: {}\n'.format(get_locations.__name__) +
+         '- times: {} - {}\n'.format(start, end)
+    )
+
+    if conf.sim_type is not None:
+        workload_dir = 'workload/'+conf.sim_type+'/'
+    else:
+        workload_dir = 'workload/'
+
+    info('Locations:\n{}\n'.format(locations))
+    generate_cloud = globals()[cloud_infrastructure]
+    cloud = generate_cloud(locations)
+    generate_requests = globals()[VM_request_generation_method]
+    requests = generate_requests(start, end, round_to_hour=round_to_hour, servers=cloud.servers)
+    with open(common_loc(workload_dir+'servers.pkl'), 'w') as pkl_srv:
+        pickle.dump(cloud, pkl_srv)
+    requests.to_pickle(common_loc(workload_dir+'requests.pkl'))
+    info('Servers:\n{}\n'.format(cloud.servers))
+    info('Requests:\n{}\n'.format(requests))
+    info('Wrote to {}:\n - servers.pkl\n - requests.pkl\n'.format(
+        common_loc(workload_dir)))
+
 def servers_from_pickle():
     with open(common_loc('workload/servers.pkl')) as pkl_srv:
         return pickle.load(pkl_srv)
@@ -813,6 +862,18 @@ def servers_from_pickle():
 # TODO: add offset
 def requests_from_pickle(*args, **kwargs): # TODO: don't need input
     requests = pd.read_pickle(common_loc('workload/requests.pkl'))
+    if 'offset' in kwargs:
+        offset = kwargs['offset']
+        requests.index = requests.index + offset
+    return requests
+
+def servers_from_pickle_with_scenario():
+    with open(common_loc('workload/'+conf.sim_type+'/servers.pkl')) as pkl_srv:
+        return pickle.load(pkl_srv)
+
+# TODO: add offset
+def requests_from_pickle_with_scenario(*args, **kwargs): # TODO: don't need input
+    requests = pd.read_pickle(common_loc('workload/'+conf.sim_type+'/requests.pkl'))
     if 'offset' in kwargs:
         offset = kwargs['offset']
         requests.index = requests.index + offset

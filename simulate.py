@@ -44,6 +44,14 @@ def cli_inputgen(conf):
     from philharmonic.simulator.inputgen import generate_fixed_input
     generate_fixed_input()
 
+@cli.command('inputgen_dynamic')
+@click.option('--conf', default='philharmonic.settings.base',
+              help='The main conf module to load.')
+def cli_inputgen(conf):
+    philharmonic._setup(conf)
+    from philharmonic.simulator.inputgen import generate_dynamic_input
+    generate_dynamic_input()
+
 @cli.command()
 @click.option('--conf', default='philharmonic.settings.base',
               help='The main conf module to load.')

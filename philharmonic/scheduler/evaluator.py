@@ -159,6 +159,8 @@ def calculate_cloud_metrics(cloud, environment, schedule,
             host_after = after.allocation(action.vm)
 
             t = pd.Timestamp(t.date()) + pd.offsets.Hour(t.hour+1)
+            if t > end:
+                t = end
             #if host_before or host_after is None, it's a boot/delete
             if (action.name == 'migrate' and host_before and
                 host_after and host_before != host_after):

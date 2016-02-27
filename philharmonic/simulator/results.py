@@ -5,12 +5,14 @@ simulation.
 
 import pickle
 from datetime import datetime
+from time import strftime
 import pprint
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib
 
 from philharmonic import conf
 import philharmonic as ph
@@ -284,34 +286,30 @@ def serialise_results(cloud, env, schedule):
 
 
 def scenario_name_mapping(scenario):
+    """maps each scenario number to its name abbreviation"""
     mapping = {
-        '1': 'BFD',
-        '2': 'BCU',
-        '3': 'BCU_F',
-        '4': 'BCU_IF',
-        '5': 'BCU_M',
-        '6': 'BCU_MF',
-        '7': 'BCU_MIF'
+        1: 'BFD',
+        2: 'BCU',
+        3: 'BCU_F',
+        4: 'BCU_IF',
+        5: 'BCU_M',
+        6: 'BCU_MF',
+        7: 'BCU_MIF'
     }
 
     return mapping[scenario]
 
 def scenario_name_mappings(scenarios):
-    mapping = {
-        '1': 'BFD',
-        '2': 'BCU',
-        '3': 'BCU_F',
-        '4': 'BCU_IF',
-        '5': 'BCU_M',
-        '6': 'BCU_MF',
-        '7': 'BCU_MIF'
-    }
-
+    """maps all given scenarios to their names"""
     mappings = []
     for s in scenarios:
-        mappings.append(mapping[str(s)])
+        mappings.append(scenario_name_mapping(s))
 
     return mappings
+
+
+def metric_names():
+    return ['TCP', 'TCC', 'ME', 'MC', 'TCPWM', 'TCCWM', 'TPC', 'TDT', 'NM', 'TP', 'TC']
 
 
 def serialise_results_batch(simulation_parameters):
@@ -320,7 +318,27 @@ def serialise_results_batch(simulation_parameters):
 
     power_vs_costs = {}
 
+    tcp = []
+    tcc = []
+    me = []
+    mc = []
+    tcpwm = []
+    tccwm = []
+    tpc = []
+    tdt = []
+    nm = []
+    tp = []
+    tc = []
+
     scenarios = []
+
+    runtimes = []
+
+    cloud_utils = {}
+
+    prices = []
+
+    fc_prices = []
 
     for sim_param in simulation_parameters.items():
 
@@ -331,10 +349,32 @@ def serialise_results_batch(simulation_parameters):
         info("====================\n\n")
         info("scenario: "+str(scenario))
 
+        [ total_cloud_power, total_cloud_costs, migration_energy, migration_cost, 
+                total_cloud_power_with_migrations, total_cloud_costs_with_migrations, 
+                total_penalty_cost, total_downtime, num_migrations, total_power, total_costs, cloud_util ] = get_results_per_location(cloud, env, schedule)
 
-        [ total_power, total_costs ] = get_results_per_location(cloud, env, schedule)
+        tcp.append(total_cloud_power)
+        tcc.append(total_cloud_costs)
+        me.append(migration_energy)
+        mc.append(migration_cost)
+        tcpwm.append(total_cloud_power_with_migrations)
+        tccwm.append(total_cloud_costs_with_migrations)
+        tpc.append(total_penalty_cost)
+        tdt.append(total_downtime)
+        nm.append(num_migrations)
+        tp.append(total_power)
+        tc.append(total_costs)
 
         power_vs_costs[scenario] = [ total_power, total_costs ]
+
+        cloud_utils[scenario] = cloud_util
+
+        runtimes.append(conf.scheduler_run_times[scenario].total_seconds())
+
+
+    conf.end_time = datetime.now()
+    runtime = conf.end_time - conf.start_time
+    runtimes.append(runtime.total_seconds())
 
 
     max_power = max(power_vs_costs.items(), key=lambda x: x[1][0])[1][0]
@@ -346,22 +386,66 @@ def serialise_results_batch(simulation_parameters):
     norm_power_values = [ p / max_power for p in power_values ]
     norm_cost_values = [ c / max_cost for c in cost_values ]
 
-
-    # aggregated = power_values
-    # aggr_names = ['BFD', 'BCU'
-    #                 # 'BCU', 'BCU_F', 'BCU_IF',
-    #                 # 'BCU_M', 'BCU_MF', 'BCU_MIF'
-    #             ]
-    # # http://en.wikipedia.org/wiki/Gross_profit
-    # # Towards Profitable Virtual Machine Placement in the Data Center Shi
-    # # and Hong 2011 - total profit, revenue and operational cost
-    # aggregated_results = pd.Series(aggregated, aggr_names)
-    # aggregated_results.to_pickle(output_loc('results.pkl'))
-
     results = {}
     results_norm = {}
+    runtime_dict = {}
+    metrics = {}
+    metrics_norm = {}
 
     scenario_names = scenario_name_mappings(scenarios)
+
+    for i in range(len(scenario_names)):
+
+        scen_metrics = []
+        scen_metrics.append(tcp[i])
+        scen_metrics.append(tcc[i])
+        scen_metrics.append(me[i])
+        scen_metrics.append(mc[i])
+        scen_metrics.append(tcpwm[i])
+        scen_metrics.append(tccwm[i])
+        scen_metrics.append(tpc[i])
+        scen_metrics.append(tdt[i])
+        scen_metrics.append(nm[i])
+        scen_metrics.append(tp[i])
+        scen_metrics.append(tc[i])
+
+        scen_metrics_norm = []
+        scen_metrics_norm.append(tcp[i] / float(max(tcp) if max(tcp) > 0 else 1))
+        scen_metrics_norm.append(tcc[i] / float(max(tcc) if max(tcc) > 0 else 1))
+        scen_metrics_norm.append(me[i] / float(max(me) if max(me) > 0 else 1))
+        scen_metrics_norm.append(mc[i] / float(max(mc) if max(mc) > 0 else 1))
+        scen_metrics_norm.append(tcpwm[i] / float(max(tcpwm) if max(tcpwm) > 0 else 1))
+        scen_metrics_norm.append(tccwm[i] / float(max(tccwm) if max(tccwm) > 0 else 1))
+        scen_metrics_norm.append(tpc[i] / float(max(tpc) if max(tpc) > 0 else 1))
+        scen_metrics_norm.append(tdt[i] / float(max(tdt) if max(tdt) > 0 else 1))
+        scen_metrics_norm.append(nm[i] / float(max(nm) if max(nm) > 0 else 1))
+        scen_metrics_norm.append(tp[i] / float(max(tp) if max(tp) > 0 else 1))
+        scen_metrics_norm.append(tc[i] / float(max(tc) if max(tc) > 0 else 1))
+
+        metrics[scenario_names[i]] = pd.Series(scen_metrics, metric_names())
+        metrics_norm[scenario_names[i]] = pd.Series(scen_metrics_norm, metric_names())
+
+
+
+    metrics_df = pd.DataFrame(metrics)
+    metrics_df = metrics_df[scenario_names]
+    metrics_df.to_pickle(output_loc('metrics.pkl'))
+
+    metrics_norm_df = pd.DataFrame(metrics_norm)
+    metrics_norm_df = metrics_norm_df[scenario_names]
+    metrics_norm_df.to_pickle(output_loc('metrics_norm.pkl'))
+
+
+    with open(output_loc('cloud_utils.pkl'), 'wb') as handle:
+        pickle.dump(cloud_utils, handle)
+    prices = env.el_prices
+    fc_prices = env.forecast_el
+
+    prices.to_pickle(output_loc('prices.pkl'))
+    fc_prices.to_pickle(output_loc('fc_prices.pkl'))
+
+
+
     columns = ['power','cost']
 
     results['power'] = pd.Series(power_values, scenario_names)
@@ -370,7 +454,6 @@ def serialise_results_batch(simulation_parameters):
     result_df = pd.DataFrame(results)
     result_df = result_df[columns]
     result_df.to_pickle(output_loc('results.pkl'))
-
     
     results_norm['power'] = pd.Series(norm_power_values, scenario_names)
     results_norm['cost'] = pd.Series(norm_cost_values, scenario_names)
@@ -379,11 +462,21 @@ def serialise_results_batch(simulation_parameters):
     result_df_norm = result_df_norm[columns]
     result_df_norm.to_pickle(output_loc('results_norm.pkl'))
 
+    
+    # total_runtime = (conf.end_time - conf.start_time).total_seconds()
+    # runtimes.append(total_runtime)
+    runtime_names = scenario_names
+    runtime_names.append('Total')
+    # DA Summer: 1:28:55, 5335s
+    runtime_dict['runtimes'] = pd.Series(runtimes, runtime_names)
+
+    runtime_df = pd.DataFrame(runtime_dict)
+    runtime_df.to_pickle(output_loc('runtimes.pkl'))
+
 
     info('\n')
     info(results)
     info(results_norm)
-
 
 
     info("power values")
@@ -394,6 +487,20 @@ def serialise_results_batch(simulation_parameters):
     info(norm_power_values)
     info("norm cost values")
     info(norm_cost_values)
+
+    info("runtimes")
+    info(runtimes)
+
+
+    start_date = env.start.strftime('%Y%m%d')
+    end_date = env.end.strftime('%Y%m%d')
+
+    # Generate bar chart1
+    generate_bar_chart(result_df_norm, path=output_loc(str(start_date)+'_'+str(end_date)+'_results_norm.pdf'), show_chart=False)
+    generate_bar_chart(metrics_norm_df, path=output_loc(str(start_date)+'_'+str(end_date)+'_metrics_norm.pdf'), colormap='Oranges', hatch=False, show_chart=False)
+
+
+    info('\nDone. All results saved to: {}'.format(conf.output_folder))
 
 
 def get_results_per_location(cloud, env, schedule):
@@ -444,10 +551,13 @@ def get_results_per_location(cloud, env, schedule):
     #           results from real simulation with 100 servers: 1.84 $
     #   exact simulation reference: bcu/2016-02-21/172949_*
 
+
     # calculate cloud power in kWh
     cloud_power = evaluator.generate_cloud_power_per_location(cloud_util, active_servers, cloud, env, schedule)
     # cloud costs per location
     cloud_costs = ph.calculate_price_new(cloud_power, env.el_prices, transform_to_jouls=False)
+
+    cloud_util = cloud_util.resample(conf.power_freq, fill_method='pad')
 
     total_cloud_power = cloud_power.sum().sum() # in kWh
     total_cloud_costs = cloud_costs.sum() # in $
@@ -494,14 +604,43 @@ def get_results_per_location(cloud, env, schedule):
     info(' - total cost ($)')
     info(total_costs)
 
-    if conf.liveplot:
-        plt.show()
-    elif conf.fileplot:
-        plt.savefig(output_loc('results-graph.pdf'))
+    # if conf.liveplot:
+    #     plt.show()
+    # elif conf.fileplot:
+    #     plt.savefig(output_loc('results-graph.pdf'))
 
-    info('\nDone. Results saved to: {}'.format(conf.output_folder))
+    return [ total_cloud_power, total_cloud_costs, migration_energy, migration_cost, 
+                total_cloud_power + migration_energy, total_cloud_costs + migration_cost, 
+                total_penalty_cost, total_downtime, num_migrations, total_power, total_costs, cloud_util ]
+
+
+
+# generate bar chart
+
+def generate_bar_chart(result_df, path, xlim=None, ylim=(0,1.05), colormap='Greens', hatch=True, show_chart=False):
     
-    return [ total_power, total_costs ]
+    if ylim is not None:
+        ax = result_df.plot(kind='bar', ylim=ylim, rot=0, colormap=colormap, figsize=(8, 4))#, colormap='binary', Blues, Greens, Oranges, )
+    else:
+        ax = result_df.plot(kind='bar', rot=0, colormap=colormap, figsize=(8, 4))
+    
+    pred = lambda obj: isinstance(obj, matplotlib.patches.Rectangle)
+    bars = filter(pred, ax.get_children())
+    hatches = ''.join(h*len(result_df) for h in "/\-xO.")  # "/\-xO."
+
+    if hatch:
+        for bar, hatch in zip(bars[:-1], hatches):
+            bar.set_hatch(hatch)
+        #bar.set_facecolor('white')
+    legend_loc = 'lower left'
+    if not legend_loc:
+        legend_loc = 'lower left'
+    plt.legend(loc=legend_loc, ncol=2)
+    plt.savefig(path, bbox_inches='tight')
+
+    if show_chart:
+        plt.show()
+
 
 
 def serialise_results_tests():
@@ -535,6 +674,5 @@ def serialise_results_tests():
     #im_ani.save('im.mp4', metadata={'artist':'Guido'})
 
     plt.show()
-
 
 

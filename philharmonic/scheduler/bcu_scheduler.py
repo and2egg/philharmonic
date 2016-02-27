@@ -677,7 +677,8 @@ class BCUScheduler(IScheduler):
 
         result = [ u_item for u_item in u_result if u_item[2] > conf.utility_threshold ]
 
-        if len(result) > 0:
+
+        if len(result) > 0 and conf.debug:
             print ', '.join(map(str, result))
 
         return result
@@ -736,7 +737,8 @@ class BCUScheduler(IScheduler):
         if len(self.blocked_vms) == 0:
             self._init_blocked_vms()
 
-        print "Timestamp "+str(t_next)
+        if conf.debug:
+            print "Timestamp "+str(t_next)
 
         self.assign_request(t, requests, self.scenario)
         

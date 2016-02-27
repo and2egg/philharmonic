@@ -32,9 +32,16 @@ show_cloud_interval = pd.offsets.Hour(1)
 prompt_show_cloud = False
 prompt_ipdb = True
 
+# state whether debug outputs should be printed
+debug = True
+
 common_output_folder = "io/"
 base_output_folder = os.path.join(common_output_folder, "results/test/")
 output_folder = base_output_folder
+
+base_settings_path = "philharmonic/settings/"
+# as second parameter add name of scheduler settings file, e.g. bcu.py
+settings_file = os.path.join(base_settings_path, "")
 
 # control whether the input and/or output folders should be time-stamped
 add_date_to_folders = False
@@ -54,6 +61,14 @@ def rel_output_folder(add_date):
 # the real local time when the simulation is executed
 # (used to optionally time-stamp files)
 current_time = localtime()
+
+# total simulation start time
+start_time = None
+# total simulation end time
+end_time = None
+
+# dict to save scheduler run times
+scheduler_run_times = {}
 
 
 USAGE_LOC = "io/usage/" # path from the philharmonic root
@@ -87,7 +102,9 @@ temperature_dataset = os.path.join(DATA_LOC, 'temperatures.csv')
 el_price_dataset = os.path.join(DATA_LOC, 'prices.csv')
 el_price_forecast = os.path.join(DATA_LOC, 'prices.csv')
 
-dynamic_locations = False
+# choose simulation type ("DA or RT with season - e.g. DA_Summer")
+# only applicable for bcu scheduler right now
+sim_type = None
 
 date_parser = None
 
@@ -229,6 +246,7 @@ factory = {
 
     # Timestamps of the simulation. Can be:
     #  times_from_conf (take times from conf.times, recommended),
+    #  times_from_el_prices (take times from electricity prices - dynamic!)
     #  two_days, world_three_months,
     #  usa_two_hours, usa_two_days, usa_three_months
     #  world_two_hours, world_two_days, world_three_months
@@ -397,6 +415,7 @@ alternate_cost_model = False
 
 location_based = False
 
+dynamic_locations = False
 
 
 # Benchmark
