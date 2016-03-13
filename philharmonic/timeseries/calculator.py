@@ -36,7 +36,10 @@ def calculate_power_per_location(util, active_servers, P_idle=100, P_peak=200):
     in geo-distributed datacenters. In Proc. USENIX ICAC, 2013.
 
     """
-    P = util * (P_peak - P_idle) # dynamic part
+    P = util * (P_peak - P_idle) # dynamic part FLAW !!!!!!!!!!!
+                                #######   util is avg util per location!
+                                ######    this has to be multiplied by 
+                                #           number of active servers at this time!!
     # a server with no load is suspended (otherwise idle power applies)
     P[P>0] += active_servers * P_idle
 

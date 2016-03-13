@@ -276,9 +276,13 @@ class Simulator(IManager):
 
         simulation_parameters = {}
 
+        idx = 0
+
         for scenario in scenarios:
 
-            self.__init__()
+            if idx > 0:
+                self.__init__()
+                
             self.scheduler.set_scenario(scenario)
 
             if conf.show_cloud_interval is not None:
@@ -337,6 +341,8 @@ class Simulator(IManager):
             end = datetime.now()
 
             conf.scheduler_run_times[scenario] = end - start
+
+            idx += 1
 
 
         return simulation_parameters

@@ -54,13 +54,13 @@ factory['environment'] = 'BCUSimulatedEnvironment'
 
 inputgen_settings['resource_distribution'] = 'uniform' # uniform or normal
 
-inputgen_settings['server_num'] = 700
+inputgen_settings['server_num'] = 1000
 inputgen_settings['min_server_cpu'] = 4 # 16,
 inputgen_settings['max_server_cpu'] = 8 # 16,
 inputgen_settings['min_server_ram'] = 8 # 32,
 inputgen_settings['max_server_ram'] = 16 # 32,
 
-inputgen_settings['VM_num'] = 7000
+inputgen_settings['VM_num'] = 2000
 inputgen_settings['min_cpu'] = 1 # 2,
 inputgen_settings['max_cpu'] = 4 # 4,
 inputgen_settings['min_ram'] = 1 # 4,
@@ -119,6 +119,14 @@ w_cost = 1.0
 utility_threshold = 2.0
 
 
+# to evaluate: 
+# simulation, inputgen 2016-02-18 200211
+# 
+# 2014-07-11 20:00 - normal u value (1.5)
+# 2014-07-17 10:00 - high u value (2.7)
+# 2014-07-18 21:00 - ultra high u value (4.4)
+
+
 
 ### simulation parameters ###
 
@@ -145,19 +153,6 @@ min_price_threshold = 0.001 # 1 $ / kWh
 # minimum remaining duration of vm in simulation timesteps to be considered for migration
 min_vm_remaining = 1
 
-
-
-
-# P = 0.2 * 1000 * 38 * 24 = 182400 kW
-# C = P * 0.04 $ = 7296 (with average energy price of 0.04 $/kWh)
-# 7296 $, 182400 kW over simulation time range for 200 servers at peak
-
-# 38*24 timestamps = 912
-# avg duration of vm = 12 h
-# -> number of time spans of consecutive vms = 912 / 12 = 76
-# -> with 1 server and 76 vms started there is approx. 1 vm active on average
-# 		server utilisation ~ 1/4 to 1/2
-# 
 
 
 bandwidth_da = {
@@ -209,7 +204,7 @@ bandwidth_rt = {
 # DATA_LOC_SIM_DA: DA input from USA and Europe (ISO-NE, PJM, NordPoolSpot)
 # DATA_LOC_SIM_RT: RT input from USA (ISO-NE, PJM)
 
-sim_type = "RT_Summer" # DA or RT with season
+sim_type = "DA_Summer" # DA or RT with season
 
 if sim_type == "DA_Spring":
 	DATA_LOC = DATA_LOC_SIM_DA
