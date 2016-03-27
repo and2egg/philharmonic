@@ -102,6 +102,12 @@ temperature_dataset = os.path.join(DATA_LOC, 'temperatures.csv')
 el_price_dataset = os.path.join(DATA_LOC, 'prices.csv')
 el_price_forecast = os.path.join(DATA_LOC, 'prices.csv')
 
+
+# data input from application server
+el_price_url = 'http://localhost:8081/em-app/rest/daprices/price/csv/1,3,4/2014-07-07/2014-07-10?transformPrice=true'
+el_price_forecast_url = 'http://localhost:8081/em-app/rest/r/forecastAll/da/1,3,4/14/2014-07-07/2014-07-10'
+
+
 # choose simulation type ("DA or RT with season - e.g. DA_Summer")
 # only applicable for bcu scheduler right now
 sim_type = None

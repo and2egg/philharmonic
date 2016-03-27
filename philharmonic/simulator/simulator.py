@@ -156,7 +156,7 @@ class Simulator(IManager):
             self.environment.forecast_el = self._create(inputgen,
                                                   self.factory['forecast_el'])
         elif self.factory['forecast_type'] == "real_forecasts":
-            self.environment.get_real_forecasts()
+            self.environment.forecast_el = self.environment.get_real_forecasts(conf.el_price_forecast_url)
         elif self.factory['forecast_type'] == "real_forecast_map":
             self.environment.get_real_forecast_map(forecast_periods)
 

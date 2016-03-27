@@ -190,7 +190,7 @@ def calculate_migration_load(vm, loc1, loc2, bandwidth_map={}):
         bandwidth = bandwidth_map[loc1][loc2]
     try:
         if vm.dpr >= (bandwidth / 8.):
-            n = n_max
+            n = n_max # TODO Andreas: Shouldn't it be n=0 (need n_max iterations to determine that vm.dpr >= bw ?)
         else:
             # get the estimated pre-copy iteration for reaching a defined threshold V_thd
             n = int(math.ceil(math.log(V_thd/float(memory),
@@ -198,7 +198,7 @@ def calculate_migration_load(vm, loc1, loc2, bandwidth_map={}):
         if n > n_max:
             n = n_max
     except ZeroDivisionError:
-        n = 1 # TODO: check what raises this error
+        n = 1  # TODO: check what raises this error
     # Typically add 1/3 of memory to get migration data
     if vm.dpr >= (bandwidth / 8.):
         migration_data = memory*n_max

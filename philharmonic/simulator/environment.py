@@ -207,8 +207,61 @@ class SimpleSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
         request = set([req.vm for req in requests.values if req.what == 'delete' and req.vm == vm])
         return request
 
+class ForecastSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
+
+    def _retrieve_forecasts(self, url):
+        # retrieve forecasts from web service
+        import urllib2
+        response = urllib2.urlopen(url).read()
+        with open("csvData.csv", "w") as csv_file:
+            csv_file.write(response)
+        df = pd.read_csv('csvData.csv', engine='python', parse_dates=[0], escapechar='\\', index_col=0)
+        return df
+
+    def get_real_forecasts(self, url):
+        print("get real forecasts for simulation period (REST interface)")
+        self.real_forecasts = self._retrieve_forecasts(url)
+
+    def _generate_forecast_map(self, el_prices, forecast_periods=5, forecast_freq='H'):
+        """ Generate a map to assign forecast values to each timestamp
+            1. create mapping -> timestamp to DataFrame
+            2. iterate through each timestamp
+            3. At each timestamp add forecasts for each location to DataFrame
+                  for given forecast_periods (fc horizon)
+            4. Return mapping over simlation period
+
+        """
+        locations = el_prices.axes[1]
+        price_df_list = []
+
+        # iterate through all simulation times
+        for index, prices in el_prices.iterrows():
+            # start with the next hour
+            ind = index + pd.DateOffset(hours=1)
+            ind = pd.date_range(start=ind, periods=forecast_periods, freq=forecast_freq)
+            price_df = pd.DataFrame(index=ind, columns=locations)
+            for loc in locations:
+                price = prices[loc]
+                values = self._get_forecast_values(price, forecast_periods)
+                price_df[loc] = values
+
+            # add to df list
+            price_df_list.append(price_df)
+
+        data_map = pd.DataFrame(index=el_prices.index,
+                                data={'values': price_df_list})
+        # Sample df entry retrieval
+        # idx = pd.Timestamp('2014-07-07 00:00:00')  # or just '2014-07-07 00:00:00'
+        # print "map at index {}: {}".format(idx, data_map.loc[idx]['values'])
+        return data_map
+
+    def get_real_forecast_map(self, forecast_periods=5, forecast_freq='H'):
+        print("get real forecasts for {} periods".format(forecast_periods))
+        self.forecast_data_map = self._generate_forecast_map(self.el_prices, forecast_periods, forecast_freq)
+
+
     
-class BCUSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
+class BCUSimulatedEnvironment(ForecastSimulatedEnvironment):
     """Create environment suitable for the best cost utility scheduler"""
     def __init__(self, times=None, requests=None, forecast_periods=24):
         """@param times: list of time ticks"""
@@ -352,56 +405,3 @@ class BCUSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
                 vm.penalties += 1
 
 
-
-class ForecastSimulatedEnvironment(FBFSimpleSimulatedEnvironment):
-
-    def _retrieve_forecasts(self):
-        # retrieve forecasts from web service
-        import urllib2
-        url = 'http://localhost:8081/em-app/rest/r/forecastAll/1,3,4/14/2014-07-07/2014-07-10'
-        response = urllib2.urlopen(url).read()
-        with open("csvData.csv", "w") as csv_file:
-            csv_file.write(response)
-        df = pd.read_csv('csvData.csv', engine='python', parse_dates=[0], escapechar='\\', index_col=0)
-        return df
-
-    def get_real_forecasts(self):
-        print("get real forecasts for simulation period (REST interface)")
-        self.real_forecasts = self._retrieve_forecasts()
-
-    def _generate_forecast_map(self, el_prices, forecast_periods=5, forecast_freq='H'):
-        """ Generate a map to assign forecast values to each timestamp
-            1. create mapping -> timestamp to DataFrame
-            2. iterate through each timestamp
-            3. At each timestamp add forecasts for each location to DataFrame
-                  for given forecast_periods (fc horizon)
-            4. Return mapping over simlation period
-
-        """
-        locations = el_prices.axes[1]
-        price_df_list = []
-        
-        #iterate through all simulation times
-        for index, prices in el_prices.iterrows():
-            # start with the next hour
-            ind = index + pd.DateOffset(hours=1)
-            ind = pd.date_range(start=ind, periods=forecast_periods, freq=forecast_freq)
-            price_df = pd.DataFrame(index=ind, columns=locations)
-            for loc in locations:
-                price = prices[loc]
-                values = self._get_forecast_values(price, forecast_periods)
-                price_df[loc] = values
-            
-            # add to df list
-            price_df_list.append(price_df)
-
-        data_map = pd.DataFrame(index=el_prices.index,
-                                data={'values': price_df_list})
-        # Sample df entry retrieval
-        # idx = pd.Timestamp('2014-07-07 00:00:00')  # or just '2014-07-07 00:00:00'
-        # print "map at index {}: {}".format(idx, data_map.loc[idx]['values'])
-        return data_map
-
-    def get_real_forecast_map(self, forecast_periods=5, forecast_freq='H'):
-        print("get real forecasts for {} periods".format(forecast_periods))
-        self.forecast_data_map = self._generate_forecast_map(self.el_prices, forecast_periods, forecast_freq)

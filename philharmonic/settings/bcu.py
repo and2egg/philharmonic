@@ -281,11 +281,15 @@ P_idle = 100
 
 show_cloud_interval = None
 
+# data input from application server
+el_price_url = 'http://localhost:8081/em-app/rest/daprices/price/csv/1,2,4/2014-07-11/2014-07-12?transformPrice=true'
+el_price_forecast_url = 'http://localhost:8081/em-app/rest/r/forecastAll/da/1,3,4/14/2014-07-07/2014-07-10'
+
 # generate_forecasts: forecasts will be generated based on a given standard deviation
 # local_forecasts: forecasts will be read from file, specified under property el_price_forecast
 # real_forecasts: "real" forecasts will be retrieved from server (web service)
 # real_forecast_map: "real" forecasts will be retrieved from server for each hour separately
-factory['forecast_type'] = 'local_forecasts'
+factory['forecast_type'] = 'real_forecasts'
 # possible values: el_prices_from_conf, mixed_2_loc
 factory['el_prices'] = 'el_prices_from_conf'
 # possible values: forecast_el_from_conf, mixed_2_loc_fc
